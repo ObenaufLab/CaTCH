@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# Demultiplex samples and count the semi-random barcode occurrences in each.
+
 # Date located in: -
 from __future__ import print_function
 import sys, os, re
