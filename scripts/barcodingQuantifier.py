@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 # Demultiplex samples and count the semi-random barcode occurrences in each.
 
@@ -20,7 +20,7 @@ import Levenshtein
 usage = "Barcoding"
 parser = ArgumentParser(description=usage, formatter_class=RawDescriptionHelpFormatter)
 parser.add_argument("-f", "--fastq", type=str, required=True, dest="fastqFile", help="Fastq file")
-parser.add_argument("-b", "--barcodes", type=str, required=True, dest="barcodesFile", help="Demultiplexing 4nt-barcodes table (tab delimited: Sample Index)")
+parser.add_argument("-b", "--barcodes", type=str, required=True, dest="barcodesFile", help="Demultiplexing 4nt-barcodes table (tab delimited: Barcode \\t Sample, with header line)")
 parser.add_argument("-6", "--6bpbarcodes", type=str, required=False, dest="barcodes6bpFile", help="Demultiplexing 6nt-barcodes table (same format as above)")
 parser.add_argument('-r', "--revcomp", action='store_true', dest="revcomp", help="Reverse complement barcodes (default: false)")
 parser.add_argument('-i', "--spikein", action='store_true', dest="spikein", help="Barcode was spiked-in (default: false)")
@@ -285,7 +285,7 @@ multiplexes.sort()
 
 for multiplex in multiplexes:
 
-    fout = open(os.path,join(args.outdir, bc[multiplex] + "_barcode_counts.txt"), "w")
+    fout = open(os.path.join(args.outdir, bc[multiplex] + "_barcode_counts.txt"), "w")
 
     barcodes = library[multiplex].keys()
     barcodes.sort()
