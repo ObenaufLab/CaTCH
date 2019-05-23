@@ -86,7 +86,7 @@ if args.barcodes6bpFile:
     for multiplex in bc:
         library[multiplex] = dict()
 
-fout = open(params.unknown, "w")
+fout = open(args.unknown, "w")
 
 for record in SeqIO.parse(args.fastqFile, "fastq"):
 
@@ -283,7 +283,7 @@ multiplexes.sort()
 
 for multiplex in multiplexes:
 
-    fout = open(os.path,join(params.outdir, bc[multiplex] + "_barcode_counts.txt"), "w")
+    fout = open(os.path,join(args.outdir, bc[multiplex] + "_barcode_counts.txt"), "w")
 
     barcodes = library[multiplex].keys()
     barcodes.sort()
