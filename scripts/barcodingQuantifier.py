@@ -25,7 +25,6 @@ parser.add_argument("-6", "--6bpbarcodes", type=str, required=False, dest="barco
 parser.add_argument('-r', "--revcomp", action='store_true', dest="revcomp", help="Reverse complement barcodes (default: false)")
 parser.add_argument('-i', "--spikein", action='store_true', dest="spikein", help="Barcode was spiked-in (default: false)")
 parser.add_argument('-s', "--stringent", action='store_true', dest="stringent", help="Stringent barcode matching (default: false)")
-parser.add_argument('-u', "--unknown", type=str, required=False, dest="unknown", default="./unknown.fastq", help="Output FASTQ for files not reads not matching the barcode pattern (default: ./unknown.fastq)")
 parser.add_argument('-o', "--outdir", type=str, required=False, dest="outdir", default="./process", help="Output directory for counts (./process/)")
 
 args = parser.parse_args()
@@ -88,7 +87,7 @@ if args.barcodes6bpFile:
     for multiplex in bc:
         library[multiplex] = dict()
 
-fout = open(args.unknown, "w")
+fout = open(os.path.join(args.outdir, "unmatched.fastq"), "w")
 
 for record in SeqIO.parse(args.fastqFile, "fastq"):
 
