@@ -30,28 +30,6 @@ library(ggrepel)
 library(RColorBrewer)
 ```
 
-Plots' theme.
-
-```{r theme}
-# ggplot2 theme.
-gth <- theme(axis.line.x= element_line(),
-	         axis.line.y= element_line(),
-	         strip.background= element_rect(fill= "grey95"),
-	         strip.text.y= element_text(size= rel(1.2)),
-	         strip.text.x= element_text(size= rel(1.1)),
-	         panel.background= element_rect(fill = "white"),
-	         panel.grid.major = element_line(colour="grey95"),
-	         panel.grid.minor= element_blank(),
-	         legend.key = element_rect(fill = 'white'),
-	         plot.margin = unit(c(0.3, 1, 0.3, 0.3),"cm"),
-	         axis.text.x = element_text(angle=90, hjust=1),
-	         legend.position = "none"
-)
-
-treatCols <- c(ref="forestgreen", UT="dodgerblue", DT="mediumorchid1", bc="orange")
-getPalette <- colorRampPalette(brewer.pal(8, "Accent"))
-```
-
 Load data.
 
 ```{r data}
@@ -78,8 +56,35 @@ Set sample order.
 ```{r order}
 # Tidy up sample names.
 sampleNames <- c("Reference", "UT_414", "UT_416", "UT_417", "UT_475", "D+T_411",  "D+T_412", "D+T_413", "D+T_415", "D+T_418")
+#sampleNames <- names(counts[, -c(1,length(counts)), with=FALSE])
 samples_tidy <- data.frame(name=factor(sampleNames, levels=sampleNames, ordered=TRUE), 
                            treatment=c('ref', rep('UT', 4), rep('DT', 5)))
+# Exclude these when looking for enriched barcodes.
+#controls = c("Reference_1", "Reference_2", "DMSO_1", "DMSO_2", "DMSO_3", "DMSO_4", "DMSO_5", "DMSO_6")
+controls = c(NA_character_)
+```
+
+Plots' theme.
+
+```{r theme}
+# ggplot2 theme.
+gth <- theme(axis.line.x= element_line(),
+	         axis.line.y= element_line(),
+	         strip.background= element_rect(fill= "grey95"),
+	         strip.text.y= element_text(size= rel(1.2)),
+	         strip.text.x= element_text(size= rel(1.1)),
+	         panel.background= element_rect(fill = "white"),
+	         panel.grid.major = element_line(colour="grey95"),
+	         panel.grid.minor= element_blank(),
+	         legend.key = element_rect(fill = 'white'),
+	         plot.margin = unit(c(0.3, 1, 0.3, 0.3),"cm"),
+	         axis.text.x = element_text(angle=90, hjust=1),
+	         legend.position = "none"
+)
+
+getPalette <- colorRampPalette(brewer.pal(8, "Accent"))
+# treatCols <- c(ref="forestgreen", DMSO="green3", ERL="dodgerblue", AFAT="orchid1", OSI="firebrick", bc="orange")
+treatCols <- getPalette(length(sampleNames))
 ```
 
 Calculate proportions and tidy up the data format.
@@ -203,6 +208,7 @@ print(
 ```{r complexity}
 # Identify shared top barcodes
 sharedBarcodes <- all_tidy %>%
+  filter( ! Sample %in% controls) %>%
   filter(prop_Top) %>%
   group_by(bc_id) %>%
   summarise(numSamples=n()) %>%
@@ -224,9 +230,10 @@ print( as.data.table(all_tidy %>%
 
 The colours identify shared barcodes across samples. Samples without barcodes meeting the threshold are not shown.
 
-```{r complexity_plots, fig.height = 4, fig.width = 4}
+```{r complexity_plots}
 # Prepare colour fill.
-all_tidy[, sharedFill := factor(ifelse(bc_id %in% sharedBarcodes$bc_id, bc_id, NA), levels=c(-1, -2, 0, unique(ifelse(bc_id %in% sharedBarcodes$bc_id, bc_id, NA))))]
+all_tidy[, sharedFill := ifelse(bc_id %in% sharedBarcodes$bc_id, bc_id, NA)]
+# all_tidy[, sharedFill := factor(ifelse(bc_id %in% sharedBarcodes$bc_id, bc_id, NA), levels=c(-200, -2, 0, unique(ifelse(bc_id %in% sharedBarcodes$bc_id, bc_id, NA))))]
 
 # Numbers of Barcodes
 secScale <- max(numBarcodesThresh) / max(numBarcodes)
@@ -237,19 +244,21 @@ tmp <- all_tidy %>%
   filter(prop_Top) %>%
   arrange(desc(Proportion))
 dropped <- unique(all_tidy$Sample)[! unique(all_tidy$Sample) %in% unique(tmp$Sample)]
-tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=-2, Reads=0, Proportion=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=NA))
-
+if (length(dropped > 0)) {
+  tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=-2, Reads=0, Proportion=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=NA))
+}
 # Pad Samples to 100%
 pad <- tmp %>%
   group_by(Sample) %>%
   summarise(Proportion = 1 - sum(Proportion))
-tmp <- rbind(tmp, data.frame(Sample=pad$Sample, bc_id=-1, Reads=0, Proportion=pad$Proportion, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=-1))
+tmp <- rbind(tmp, data.frame(Sample=pad$Sample, bc_id=-200, Reads=0, Proportion=pad$Proportion, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=-200))
 
 p <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFill, group="A", label=bc_id)) +
          geom_bar(stat='identity', position=position_stack(), colour="black", width=0.9, size=0.2) +
          scale_y_continuous(expand = c(0, 0), limits= c(0,1),
                             sec.axis = sec_axis(trans = ~ .)) +
-         scale_fill_manual(values=c("black", getPalette(1 + nrow(sharedBarcodes))), na.value="grey90") +
+         # scale_fill_manual(values=c("black", getPalette(1 + nrow(sharedBarcodes))), na.value="grey90") +
+         scale_fill_gradientn(colours=c("black", getPalette(1 + nrow(sharedBarcodes))), na.value="grey90") +
          ylab("Individual barcode proportion") +
          ggtitle(paste0("Barcodes with at least ", abund_thresh * 100,"% representation")) +
          gth + theme(panel.grid.major.x = element_blank(), legend.position="none")
@@ -258,7 +267,7 @@ p <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFill, group="A", la
 # print(p)
 ```
 
-```{r complexity_plots2, fig.height = 4, fig.width = 4}
+```{r complexity_plots2}
 # Interactive for HTML.
 ggplotly(p)
 rm(tmp)
@@ -269,31 +278,31 @@ Number of barcodes passing the counts threshold vs. number of barcodes passing t
 ```{r complexity_plots3}
 # The labels can create terrible clutter if the plot is small with lots of points. 
 # Plotly enables hover-over to get Sample info
-# ggplotly(
+ggplotly(
+  ggplot(data=all_tidy %>%
+                filter(count_Good) %>%
+                group_by(Sample) %>%
+                summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)),
+         aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, colour=Treatment)) +
+    geom_point(shape=16, size=1, alpha=0.6) +
+    scale_colour_manual(values=treatCols) +
+    ggtitle("Barcode Diversity") +
+    gth + theme(legend.position = "right")
+)
+
+# Static version with labels.
+# print(
 #   ggplot(data=all_tidy %>% 
 #                 filter(count_Good) %>%
 #                 group_by(Sample) %>% 
 #                 summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)), 
-#          aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, colour=Treatment)) +
-#     geom_point(shape=16, size=1, alpha=0.6) +
-#     scale_colour_manual(values=treatCols) +
+#          aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, fill=Treatment)) +
+#     geom_label_repel(colour="black", fill="white", size=3, direction="both", force=1, min.segment.length = 0) +
+#     geom_point(shape=21) +
+#     scale_fill_manual(values=treatCols) +
 #     ggtitle("Barcode Diversity") +
 #     gth
 # )
-
-# Static version with labels.
-print(
-  ggplot(data=all_tidy %>% 
-                filter(count_Good) %>%
-                group_by(Sample) %>% 
-                summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)), 
-         aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, fill=Treatment)) +
-    geom_label_repel(colour="black", fill="white", size=3, direction="both", force=1, min.segment.length = 0) +
-    geom_point(shape=21) +
-    scale_fill_manual(values=treatCols) +
-    ggtitle("Barcode Diversity") +
-    gth
-)
 ```
 
 # Enrichment of top shared barcodes
@@ -332,7 +341,7 @@ for (bc in sharedBarcodes$bc_id) {
 
 ## Matrix
 
-```{r enrichment2}
+```{r enrichment2, fig.height = 10, fig.width = 7}
 top <- all_tidy %>% 
   filter(prop_Top) %>%
   select(bc_id) %>%
