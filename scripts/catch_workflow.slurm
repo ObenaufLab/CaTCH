@@ -90,19 +90,19 @@ if [[ -z "$barcodes2" ]]; then
 else
   ${SCRIPTSPATH}/barcodingQuantifier.py -f $fastq -o $outdir -b $barcodes -6 $barcodes2 $revcomp $spikedin $stringent
 fi
-unknown="${outdir}/${prefix}_unmatched.fastq"
-umcounts="${outdir}/${prefix}_unmatched_barcode_counts.txt}"
-mv ${outdir}/unmatched.fastq $unknown
-mv ${outdir}/unmatched_barcode_counts.txt $umcounts
+unknown="${outdir}/unmatched.fastq"
+umcounts="${outdir}/unmatched_barcode_counts.txt"
+
+# Save space.
+echo "${prefix}: Compressing unmatched reads"
+gzip $unknown
 # echo "${fastq}: Re-compressing reads"
 # gzip $fastq
 rm $fastq
 
-# Sort unmatched barcodes by count and compress unmatched fastq
+# Sort unmatched barcodes by count
 echo "${prefix}: Sorting unmatched barcodes by count"
 ${SCRIPTSPATH}/sort_unmatched.R $umcounts
-echo "${prefix}: Compressing unmatched reads"
-gzip ${outdir}/unmatched.fastq
 rm $umcounts      # Prevents it from being pulled into the merge in the next step. The sorted version has a different suffix and won't be pulled in.
 
 # Merge sample-specific count tables into one collective table
