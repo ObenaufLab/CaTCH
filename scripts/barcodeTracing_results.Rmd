@@ -13,8 +13,10 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r pdfstart}
-#pdf('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_barcode_tracing/paper/experiment2.pdf', paper="a4")
+```{r outfiles}
+#pdf('/Volumes/groups/obenauf/Kimon_Froussios/chris/PC9/results/barcodeTracing_results_human.pdf', paper="a4")
+cfcsv <- '/Volumes/groups/obenauf/Kimon_Froussios/chris/PC9/results/readcounts_filtered.csv'
+bfcsv <- '/Volumes/groups/obenauf/Kimon_Froussios/chris/PC9/results/top_barcodes.csv'
 ```
 
 # Preparation
@@ -366,7 +368,22 @@ ggplotly(p)
 
 
 
-
 ```{r pdfend}
 #dev.off()
+```
+
+
+# Write tables
+
+```{r count_table}
+# Filtered by minimal count to reduce size and sequencing error noise.
+fct <- all_tidy %>% filter(count_Good) %>% select(bc_id, Sample, Reads) %>% unique() %>% spread(Sample, Reads)
+fct[is.na(fct)] <- 0
+fwrite(counts %>% select(bc_id, barcode) %>% right_join(fct, by='bc_id'), file=cfcsv)
+```
+
+```{r top_barcodes_table}
+bct <- all_tidy %>% filter(prop_Top) %>% select(bc_id, Sample, Proportion) %>% unique() %>% spread(Sample, Proportion)
+bct[is.na(bct)] <- 0
+fwrite(counts %>% select(bc_id, barcode) %>% right_join(bct, by='bc_id'), file=bfcsv)
 ```
