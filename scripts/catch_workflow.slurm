@@ -18,7 +18,9 @@ function usage() {
 
 # Defaults
 SCRIPTSPATH='/users/kimon.froussios/catch/scripts'
-FU='/users/kimon.froussios/utility_scripts/fileutilities.py'
+#FU='/users/kimon.froussios/utility_scripts'
+FU=$SCRIPTSPATH
+PYTHONPATH="$PYTHONPATH:$FU"
 # Parse options.
 while getopts 'b:c:6:o:u:X:K:rism' flag; do
   case "${flag}" in
@@ -27,7 +29,7 @@ while getopts 'b:c:6:o:u:X:K:rism' flag; do
     6) barcodes2="${OPTARG}" ;;   # Demultiplexing table for 6nt barcodes
     o) outdir="${OPTARG}" ;;      # Output directory for the counts
     X) SCRIPTSPATH="${OPTARG}" ;; # Where to find all the scripts for this workflow
-    K) FU="${OPTARG}" ;;          # Where to find my fileutilities.py
+    K) FU="${OPTARG}" ;;          # Where to find my fileutilities.py and mylogs.py
     r) revcomp="${OPTARG}" ;;     # Reverse complement the barcodes
     i) spikedin="${OPTARG}" ;;    # Spike-in barcode was added (hard-coded barcode sequence)
     s) stringent="${OPTARG}" ;;   # Match full format of semi-random barcodes
@@ -107,11 +109,11 @@ rm $umcounts      # Prevents it from being pulled into the merge in the next ste
 
 # Merge sample-specific count tables into one collective table
 echo "${prefix}: Merging sample-specific count tables into one"
-$FU T $outdir --dir _barcode_counts.txt | perl -e 'while(<>){~s/_barcode_counts$//;print}' | $FU P -i --merge outer no yes > ${outdir}/${prefix}_tmp.tsv
+${FU}/fileutilities.py T $outdir --dir _barcode_counts.txt | perl -e 'while(<>){~s/_barcode_counts$//;print}' | ${FU}/fileutilities.py P -i --merge outer no yes > ${outdir}/${prefix}_tmp.tsv
 head -n 1 ${outdir}/${prefix}_tmp.tsv | perl -e 'while(<>){~s/_\|\d+//g; print}' > ${outdir}/${prefix}_barcode_counts.tsv   # Clean up the header
 tail -n +2 ${outdir}/${prefix}_tmp.tsv >> ${outdir}/${prefix}_barcode_counts.tsv
 rm ${outdir}/${prefix}_tmp.tsv
-$FU T $outdir --dir _barcode_counts.txt | fileutilities.py P --loop rm {abs}
+${FU}/fileutilities.py T $outdir --dir _barcode_counts.txt | ${FU}/fileutilities.py P --loop rm {abs}
 # Rename barcode column
 head -n 1 ${outdir}/${prefix}_barcode_counts.tsv | perl -e 'while(<>){~s/row_ID/barcode/;print}' > ${outdir}/tmp
 tail -n +2 ${outdir}/${prefix}_barcode_counts.tsv >> ${outdir}/tmp
