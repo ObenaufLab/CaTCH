@@ -32,7 +32,7 @@ while getopts 'b:c:6:o:u:X:K:rism' flag; do
     r) revcomp="${OPTARG}" ;;     # Reverse complement the barcodes
     i) spikedin="${OPTARG}" ;;    # Spike-in barcode was added (hard-coded barcode sequence)
     s) stringent="${OPTARG}" ;;   # Match full format of semi-random barcodes
-    m) merge="${OPTARGS}" ;;      # Allow for sequencing errors in barcodes by merging very similar barcodes when one is common and the others are rare.
+    m) merge="${OPTARGS}" ;;      # NOT IMPLEMENTED? Allow for sequencing errors in barcodes by merging very similar barcodes when one is common and the others are rare.
     *) usage ;;
   esac
 done
@@ -93,6 +93,11 @@ else
 fi
 unknown="${outdir}/unmatched.fastq"
 umcounts="${outdir}/unmatched_barcode_counts.txt"
+
+##
+## Merging very similar barcode sequences with vastly different abundances using barcodingHammingMerge.py would go somewhere here in the workflow.
+## Currently such barcodes are kept separate and likely rejected when the count threshold is applied in the analysis afterwards.
+##
 
 # Save space.
 echo "${prefix}: Compressing unmatched reads"

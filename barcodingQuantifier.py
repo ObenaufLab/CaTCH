@@ -15,7 +15,7 @@ import os.path
 from Bio import SeqIO
 from Bio.Seq import Seq
 from string import upper
-import Levenshtein
+#import Levenshtein
 
 usage = "Barcoding"
 parser = ArgumentParser(description=usage, formatter_class=RawDescriptionHelpFormatter)
@@ -30,9 +30,12 @@ parser.add_argument('-o', "--outdir", type=str, required=False, dest="outdir", d
 args = parser.parse_args()
 
 ##############
-# Read bc
+# Read demultiplexing tags
 ##############
 
+# (tag size affects substring operations later, can probably be recoded to be dynamic but not worth the effort at present)
+
+# 4bp tags 
 bc = dict()
 bcStats = dict()
 
@@ -47,25 +50,23 @@ with(open(args.barcodesFile, 'r')) as f:
 bc["unmatched"] = "unmatched"
 bcStats["unmatched"] = 0
 
-##############
-# Read 6bp barcodes
-##############
-
+# 6bp tags
 if args.barcodes6bpFile:
-
     with(open(args.barcodes6bpFile, 'r')) as f:
-    # skip header
+        # skip header
         next(f)
         for line in f:
             barcode, sample = line.rstrip().split("\t")
             bc[barcode] = sample
             bcStats[barcode] = 0
 
-if args.revcomp:
+##############
+# Reverse complement the tags
+##############
 
+if args.revcomp:
     bcRevCompStats = {}
     bcRevComp = {}
-
     for barcode in bc:
         if barcode != "unmatched":
             bcRevComp[str(Seq(barcode).reverse_complement())] = bc[barcode]
@@ -73,27 +74,28 @@ if args.revcomp:
         else :
             bcRevComp["unmatched"] = "unmatched"
             bcRevCompStats["unmatched"] = 0
-
     bc = bcRevComp
     bcStats = bcRevCompStats
 
-library = dict()
+##############
+# Count the barcodes
+##############
 
+# Initialize a counter for each sample
+library = dict()
 for multiplex in bc:
     library[multiplex] = dict()
 
-if args.barcodes6bpFile:
-
-    for multiplex in bc:
-        library[multiplex] = dict()
-
+# Open a destination for reads that fail to match the demultiplexing tag
 fout = open(os.path.join(args.outdir, "unmatched.fastq"), "w")
 
+# Scan the reads
 for record in SeqIO.parse(args.fastqFile, "fastq"):
 
     # GBNSNNNVDNVNVWVMWNNRCGGCGBNSNNNNDNGGCWVMWNNRCGGCGBNSNNNVDNVNVWVMWNNR <- sequencing direction
     # RNNWMVWVNVNDVNNNSNB CGCCG RNNWMVW GCC NDNNNNSNB CGCCG
 
+     # Match barcode pattern explicitly
     if args.stringent:
 
         match = re.search('[TC]{1}[ATGC]{2}[AT]{1}[TG]{1}[TGC]{1}[AT]{1}[TGC]{1}[ATGC]{1}[TGC]{1}[ATGC]{1}[ATC]{1}[TGC]{1}[ATGC]{3}[CG]{1}[ATGC]{1}[CGA]{1}CGCCG[TC]{1}[AGTC]{2}[AT]{1}[TG]{1}[TCG]{1}[AT]{1}GCC[ATGC]{1}[ACT]{1}[ATGC]{4}[GC]{1}[AGTC]{1}[CGA]{1}CGCCG', str(record.seq))
@@ -187,7 +189,7 @@ for record in SeqIO.parse(args.fastqFile, "fastq"):
 
                     SeqIO.write(record, fout, "fastq")
 
-
+    # Match barcodes by using a shorter regex, for better speed
     else :
 
         match = re.search('CGCCG[ATGC]{7}GCC[ATGC]{9}CGCCG', str(record.seq))
@@ -277,7 +279,12 @@ for record in SeqIO.parse(args.fastqFile, "fastq"):
 
                     SeqIO.write(record, fout, "fastq")
 
+# Reads that could not be demultiplexed
 fout.close()
+
+##############
+# Output the barcode counts for each sample
+##############
 
 multiplexes = library.keys()
 multiplexes.sort()
@@ -292,6 +299,10 @@ for multiplex in multiplexes:
         print(barcode + "\t" + str(library[multiplex][barcode]), file = fout)
 
     fout.close()
+
+##############
+# Demultiplexing report
+##############
 
 multiplexes = bc.keys()
 multiplexes.sort()
