@@ -11,22 +11,19 @@
 
 function usage() {
     echo "Usage:"
-    echo "      $0 -b BAM_FILE [[-c DEMUX_BC4nt | -6 DEMUX_BC6nt]] [-o OUTDIR] [-X PATH_TO_CATCH_SCRIPTS] [-r] [-i] [-s] [-m]"
-    echo "Either or both of -c and -6 must be provided."
+    echo "      $0 -b BAM_FILE [-c DEMUX_BC] [-o OUTDIR] [-X PATH_TO_CATCH_SCRIPTS] [-r] [-i] [-s]"
     exit 1
 }
 
 # Defaults
 SCRIPTSPATH='/users/kimon.froussios/catch/scripts'
 #FU='/users/kimon.froussios/utility_scripts'
-FU=$SCRIPTSPATH
-PYTHONPATH="$PYTHONPATH:$FU"
+PYTHONPATH="$PYTHONPATH:$SCRIPTSPATH"
 # Parse options.
-while getopts 'b:c:6:o:u:X:K:rism' flag; do
+while getopts 'b:c:o:u:X:K:rism' flag; do
   case "${flag}" in
     b) bam="${OPTARG}" ;;         # BAM file
-    c) barcodes="${OPTARG}" ;;    # Demultiplexing table for 4nt barcodes
-    6) barcodes2="${OPTARG}" ;;   # Demultiplexing table for 6nt barcodes
+    c) barcodes="${OPTARG}" ;;    # Demultiplexing table (for all lengths af sample tags)
     o) outdir="${OPTARG}" ;;      # Output directory for the counts
     X) SCRIPTSPATH="${OPTARG}" ;; # Where to find all the scripts for this workflow
     r) revcomp="${OPTARG}" ;;     # Reverse complement the barcodes
@@ -74,37 +71,27 @@ echo "${bam}: Loading modules"
 module load samtools/1.9-foss-2017a
 module load python/2.7.13-foss-2017a
 module load biopython/1.70-foss-2017a-python-2.7.13
-module load python-levenshtein/0.12.0-foss-2017a-python-2.7.13
+module load pysam/0.14.1-foss-2017a-python-2.7.13
+# module load python-levenshtein/0.12.0-foss-2017a-python-2.7.13
 
 prefix=$(basename $bam)
 prefix=${prefix/.bam/}
 
 # Extract to FASTQ
-echo "${bam}: Extracting to FASTQ"
-fastq=${bam/.bam/.fastq}
-samtools fastq $bam -0 $fastq
+# echo "${bam}: Extracting to FASTQ"
+# fastq=${bam/.bam/.fastq}
+# samtools fastq $bam -0 $fastq
 
 # Match semi-random barcode format, demultiplex, and count the barcodes.
-echo "${fastq}: Demultiplexing and counting barcodes"
-if [[ -z "$barcodes2" ]]; then
-  ${SCRIPTSPATH}/barcodingQuantifier.py -f $fastq -o $outdir -b $barcodes $revcomp $spikedin $stringent
-else
-  ${SCRIPTSPATH}/barcodingQuantifier.py -f $fastq -o $outdir -b $barcodes -6 $barcodes2 $revcomp $spikedin $stringent
-fi
-unknown="${outdir}/unmatched.fastq"
+echo "${prefix}: Demultiplexing and counting barcodes"
+${SCRIPTSPATH}/barcodingQuantifier.py -f $bam -o $outdir -b $barcodes $revcomp $spikedin $stringent
+unknown="${outdir}/unmatched.bam"
 umcounts="${outdir}/unmatched_barcode_counts.txt"
 
 ##
 ## Merging very similar barcode sequences with vastly different abundances using barcodingHammingMerge.py would go somewhere here in the workflow.
 ## Currently such barcodes are kept separate and likely rejected when the count threshold is applied in the analysis afterwards.
 ##
-
-# Save space.
-echo "${prefix}: Compressing unmatched reads"
-gzip $unknown
-# echo "${fastq}: Re-compressing reads"
-# gzip $fastq
-# rm $fastq
 
 # Sort unmatched barcodes by count
 echo "${prefix}: Sorting unmatched barcodes by count"
