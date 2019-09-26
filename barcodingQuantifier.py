@@ -1,10 +1,10 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 # Demultiplex samples and count the semi-random barcode occurrences in each.
 
 # Date located in: -
 
-from __future__ import print_function
+# from __future__ import print_function
 
 import sys, os, re
 # import subprocess
@@ -32,23 +32,19 @@ args = parser.parse_args()
 ##############
 
 bc = dict()       # dictionary of sample tags
+tagLens = None     # set of sample tag lengths
 if args.barcodesFile:
     with(open(args.barcodesFile, 'r')) as f:
         # skip header
         next(f)
         for line in f:
             barcode, sample = line.rstrip().split("\t")
+            if args.revcomp:
+                barcode = str(Seq(barcode).reverse_complement())
             bc[barcode] = sample
-# Collect sample tag size(s)
-tagLens = None
-if bc:
-    tagLens = {len(x) for x in bc}  # Set.
-
-if args.revcomp:
-    bcRevComp = {}
-    for barcode in bc:
-        bcRevComp[str(Seq(barcode).reverse_complement())] = bc[barcode]
-    bc = bcRevComp
+    tagLens = {len(x) for x in bc}
+else:
+    bc["demuxed"] = os.path.basename(args.bamFile)
 
 ##############
 # Barcode designs
@@ -101,21 +97,26 @@ for multiplex in bc:                # including unmatched
 def recognize(mypattern, myread, samples=bc, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra=offset):
     match = mypattern.search(myread)
     if match:
-        barcode = myread[(match.start(0) - extra):(match.start(0) - extra + bcl)]          # The pattern is part of the barcode.
-        genotyping = myread[(match.start(0) - extra - gtl):(match.start(0) - extra)]     # The genotyping tag is immediately before the barcode.
+        start = match.start(0) - extra
+        barcode = myread[start:(start + bcl)]          # The pattern is part of the barcode.
+        genotyping = myread[(start - gtl):start]     # The genotyping tag is immediately before the barcode.
 
         found = False       # flag to report whether any of the different tag lengths had a match
         sampleTag=None
-        for k in sampleTagLens:                   # Flexible length.
-            sampleTag = myread[(match.start(0) - extra - gtl - k):(match.start(0) - extra - gtl)]  # The sample tag is either immediately before the gentype tag, or not present.
-            if sampleTag in bc:
-                found = True
-                bcStats.update([sampleTag])             # total hits for the sample
-                library[sampleTag].update([barcode])    # hits of the barode in the sample
-                break
-        if not found:
-            bcStats.update(["unmatched"])
-            library["unmatched"].update([barcode])
+        if sampleTagLens:
+            for k in sampleTagLens:                   # Flexible length.
+                sampleTag = myread[(start - gtl - k):(start - gtl)]  # The sample tag is either immediately before the gentype tag, or not present.
+                if sampleTag in bc:
+                    found = True
+                    bcStats.update([sampleTag])             # total hits for the sample
+                    library[sampleTag].update([barcode])    # hits of the barode in the sample
+                    break
+            if not found:
+                bcStats.update([bc["unmatched"]])
+                library["unmatched"].update([barcode])
+        else:
+            bcStats.update([bc["demuxed"]])
+            library["demuxed"].update([barcode])
         return True
     else:
         return False
@@ -123,7 +124,7 @@ def recognize(mypattern, myread, samples=bc, bcl = args.bc_len, gtl = args.gt_le
 with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Checking for reference sequences in the header has to be disabled for unaligned BAM.
     # Open a destination for reads that fail to match the demultiplexing tag
     # fout = open(os.path.join(args.outdir, "unmatched.sam"), "w")
-    with pysam.AlignmentFile(os.path.join(args.outdir, "unmatched.sam"), 'wb', template=fin) as fout:
+    with pysam.AlignmentFile(os.path.join(args.outdir, "unmatched.bam"), 'wb', template=fin) as fout:
         # Scan the reads
         for record in fin:
             if recognize(bc_pattern, record.query_sequence):
