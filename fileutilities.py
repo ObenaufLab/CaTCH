@@ -413,6 +413,9 @@ def count_columns(flist=[None], colSep=["\t"]):
             f = open(file)
         while True:
             line = f.readline()
+            if len(line) == 0:
+                sys.stderr.write(file + "is empty!\n")
+                exit(1)
             # Skip comments.
             if line[0] != "#":
                 counts.append(len( tokenizer.split(line.rstrip()) ))
