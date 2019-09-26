@@ -34,6 +34,10 @@ while getopts 'b:c:o:u:X:K:rism' flag; do
   esac
 done
 
+if [[ ! -z "$barcodes" ]]; then
+    barcodes="-b ${barcodes}"
+fi
+
 if [[ -z "$outdir" ]]; then
   outdir='./process'
 fi
@@ -67,24 +71,19 @@ fi
 set -e
 
 # Modules
-echo "${bam}: Loading modules"
-module load samtools/1.9-foss-2017a
-module load python/2.7.13-foss-2017a
-module load biopython/1.70-foss-2017a-python-2.7.13
-module load pysam/0.14.1-foss-2017a-python-2.7.13
+# echo "${bam}: Loading modules"
+# module load samtools/1.9-foss-2017a
+# module load python/2.7.13-foss-2017a
+# module load biopython/1.70-foss-2017a-python-2.7.13
+# module load pysam/0.14.1-foss-2017a-python-2.7.13
 # module load python-levenshtein/0.12.0-foss-2017a-python-2.7.13
 
 prefix=$(basename $bam)
 prefix=${prefix/.bam/}
 
-# Extract to FASTQ
-# echo "${bam}: Extracting to FASTQ"
-# fastq=${bam/.bam/.fastq}
-# samtools fastq $bam -0 $fastq
-
 # Match semi-random barcode format, demultiplex, and count the barcodes.
 echo "${prefix}: Demultiplexing and counting barcodes"
-${SCRIPTSPATH}/barcodingQuantifier.py -f $bam -o $outdir -b $barcodes $revcomp $spikedin $stringent
+${SCRIPTSPATH}/barcodingQuantifier.py -f $bam -o $outdir $barcodes $revcomp $spikedin $stringent
 unknown="${outdir}/unmatched.bam"
 umcounts="${outdir}/unmatched_barcode_counts.txt"
 
@@ -93,9 +92,11 @@ umcounts="${outdir}/unmatched_barcode_counts.txt"
 ## Currently such barcodes are kept separate and likely rejected when the count threshold is applied in the analysis afterwards.
 ##
 
-# Sort unmatched barcodes by count
-echo "${prefix}: Sorting unmatched barcodes by count"
-${SCRIPTSPATH}/sort_unmatched.R $umcounts
+if [[ "$(du -b ${umcounts} | cut -f1)" -gt 0 ]]; then
+    # Sort unmatched barcodes by count
+    echo "${prefix}: Sorting unmatched barcodes by count"
+    ${SCRIPTSPATH}/sort_unmatched.R $umcounts
+fi
 rm $umcounts      # Prevents it from being pulled into the merge in the next step. The sorted version has a different suffix and won't be pulled in.
 
 # Merge sample-specific count tables into one collective table
@@ -103,8 +104,8 @@ echo "${prefix}: Merging sample-specific count tables into one"
 ${SCRIPTSPATH}/fileutilities.py T $outdir --dir _barcode_counts.txt | perl -e 'while(<>){~s/_barcode_counts$//;print}' | ${SCRIPTSPATH}/fileutilities.py P -i --merge outer no yes > ${outdir}/${prefix}_tmp.tsv
 head -n 1 ${outdir}/${prefix}_tmp.tsv | perl -e 'while(<>){~s/_\|\d+//g; print}' > ${outdir}/${prefix}_barcode_counts.tsv   # Clean up the header
 tail -n +2 ${outdir}/${prefix}_tmp.tsv >> ${outdir}/${prefix}_barcode_counts.tsv
-# ${SCRIPTSPATH}/fileutilities.py T $outdir --dir _barcode_counts.txt | ${SCRIPTSPATH}/fileutilities.py P --loop rm {abs}
-# rm ${outdir}/${prefix}_tmp.tsv
+${SCRIPTSPATH}/fileutilities.py T $outdir --dir _barcode_counts.txt | ${SCRIPTSPATH}/fileutilities.py P --loop rm {abs}
+rm ${outdir}/${prefix}_tmp.tsv
 
 # Rename barcode column
 head -n 1 ${outdir}/${prefix}_barcode_counts.tsv | perl -e 'while(<>){~s/row_ID/barcode/;print}' > ${outdir}/tmp
