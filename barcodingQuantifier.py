@@ -27,6 +27,8 @@ parser.add_argument('--gt_len', type=int, default=20, help="Genotyping tag lengt
 
 args = parser.parse_args()
 
+prefix = os.path.basename(args.bamFile).replace('.bam', '')
+
 ##############
 # Read demultiplexing tags
 ##############
@@ -38,13 +40,13 @@ if args.barcodesFile:
         # skip header
         next(f)
         for line in f:
-            barcode, sample = line.rstrip().split("\t")
+            multiplex, sample = line.rstrip().split("\t")
             if args.revcomp:
-                barcode = str(Seq(barcode).reverse_complement())
-            bc[barcode] = sample
+                multiplex = str(Seq(multiplex).reverse_complement())
+            bc[multiplex] = sample
     tagLens = {len(x) for x in bc}
 else:
-    bc["demuxed"] = os.path.basename(args.bamFile)
+    bc["demuxed"] = prefix
 
 ##############
 # Barcode designs
@@ -80,13 +82,14 @@ spike_pattern = re.compile('GTGTGTGGAACGAGCACAGCgccgAGAGACGGATATCACTAGTCgccgCCAT
 ##############
 
 # Global stats
-bcStats = Counter(unmatched=0)  # Counter of total matches per sample.
+bcStats = Counter()  # Counter of total matches per sample.
 
 # Initialize a counter for each sample
-bc["unmatched"] = "unmatched"       # unrecognized sample tags
 library = dict()                    # dictionary of counters. One barcode counter per sample.
-for multiplex in bc:                # including unmatched
-    library[multiplex] = Counter()
+for sample in bc.values():
+    library[sample] = Counter()
+bc["unknown"] = "sample-unknown"       # unrecognized sample tags
+bc["unmatched"] = "bc-unmatched"       # barcode pattern didn't match
 
 ##############
 # Count the barcodes
@@ -94,65 +97,68 @@ for multiplex in bc:                # including unmatched
 
 # Reduce repetitive code
 # This function directly updates the counters in the global scope.
-def recognize(mypattern, myread, samples=bc, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra=offset):
+def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra=offset):
+    myread = record.query_sequence
     match = mypattern.search(myread)
     if match:
         start = match.start(0) - extra
         barcode = myread[start:(start + bcl)]          # The pattern is part of the barcode.
         genotyping = myread[(start - gtl):start]     # The genotyping tag is immediately before the barcode.
 
-        found = False       # flag to report whether any of the different tag lengths had a match
-        sampleTag=None
         if sampleTagLens:
+            found = False       # flag to report whether any of the tag lengths resulted in a match
+            sampleTag=None
             for k in sampleTagLens:                   # Flexible length.
                 sampleTag = myread[(start - gtl - k):(start - gtl)]  # The sample tag is either immediately before the gentype tag, or not present.
                 if sampleTag in bc:
                     found = True
-                    bcStats.update([sampleTag])             # total hits for the sample
-                    library[sampleTag].update([barcode])    # hits of the barode in the sample
+                    bcStats.update([bc[sampleTag]])             # total hits for the sample
+                    library[bc[sampleTag]].update([barcode])    # hits of the barode in the sample
                     break
             if not found:
-                bcStats.update([bc["unmatched"]])
-                library["unmatched"].update([barcode])
+                bcStats.update([bc["unknown"]])
+                ##library[bc["unknown"]].update([barcode])
+                fout.write(record)
         else:
             bcStats.update([bc["demuxed"]])
-            library["demuxed"].update([barcode])
+            library[bc["demuxed"]].update([barcode])
         return True
     else:
         return False
 
+if not os.path.exists(os.path.join(args.outdir, prefix)):
+    os.mkdir(os.path.join(args.outdir, prefix))
 with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Checking for reference sequences in the header has to be disabled for unaligned BAM.
-    # Open a destination for reads that fail to match the demultiplexing tag
-    # fout = open(os.path.join(args.outdir, "unmatched.sam"), "w")
-    with pysam.AlignmentFile(os.path.join(args.outdir, "unmatched.bam"), 'wb', template=fin) as fout:
-        # Scan the reads
-        for record in fin:
-            if recognize(bc_pattern, record.query_sequence):
-                pass  # Counters are updated by the function directly, there is no additional logic to implement.
-            elif recognize(empty_pattern, record.query_sequence) :
-                pass
-            elif args.spikein and recognize(spike_pattern, record.query_sequence):
-                pass
-            else :
-                fout.write(record)
+    with pysam.AlignmentFile(os.path.join(args.outdir, prefix, prefix + "_unmatched.bam"), 'wb', template=fin) as unmatched_bc:
+        with pysam.AlignmentFile(os.path.join(args.outdir, prefix, prefix + "_unknown.bam"), 'wb', template=fin) as unknown_sample:
+            # Scan the reads
+            for record in fin:
+                if recognize(bc_pattern, record, unknown_sample):
+                    pass  # Counters are updated by the function directly, there is no additional logic to implement.
+                elif recognize(empty_pattern, record, unknown_sample) :
+                    pass
+                elif args.spikein and recognize(spike_pattern, record, unknown_sample):
+                    pass
+                else :
+                    bcStats.update([bc["unmatched"]])
+                    ##library[bc["unmatched"]].update([barcode])
+                    unmatched_bc.write(record)
 
 ##############
 # Output the barcode counts for each sample
 ##############
 
-multiplexes = sorted(library.keys())
-
-for multiplex in multiplexes:
-
-    with open(os.path.join(args.outdir, bc[multiplex].replace('/', '.') + "_barcode_counts.txt"), "w") as fout:
-        for v,c in library[multiplex].most_common():
+samples = sorted(library.keys())
+for sample in samples:
+    with open(os.path.join(args.outdir, prefix, sample.replace('/', '.')) + "_barcode-counts.txt", "w") as fout:
+        for v,c in library[sample].most_common():
             fout.write( v + "\t" + str(c) + "\n" )
 
 ##############
 # Demultiplexing report
 ##############
 
-multiplexes = sorted(bc.keys())
-
-for multiplex in multiplexes:
-    print(bc[multiplex] + "\t" + str(bcStats[multiplex]))
+samples = sorted(bcStats.keys())
+with open(os.path.join(args.outdir, prefix, prefix + "_summary.txt"), "w") as fout:
+    for sample in samples:
+        fout.write(sample + "\t" + str(bcStats[sample]) + "\n")
