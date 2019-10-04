@@ -11,22 +11,19 @@
 
 function usage() {
     echo "Usage:"
-    echo "      $0 -b BAM_FILE [[-c DEMUX_BC4nt | -6 DEMUX_BC6nt]] [-o OUTDIR] [-X PATH_TO_CATCH_SCRIPTS] [-r] [-i] [-s] [-m]"
-    echo "Either or both of -c and -6 must be provided."
+    echo "      $0 -b BAM_FILE [-c DEMUX_BC] [-o OUTDIR] [-X PATH_TO_CATCH_SCRIPTS] [-r] [-i] [-s]"
     exit 1
 }
 
 # Defaults
 SCRIPTSPATH='/users/kimon.froussios/catch/scripts'
 #FU='/users/kimon.froussios/utility_scripts'
-FU=$SCRIPTSPATH
-PYTHONPATH="$PYTHONPATH:$FU"
+PYTHONPATH="$PYTHONPATH:$SCRIPTSPATH"
 # Parse options.
-while getopts 'b:c:6:o:u:X:K:rism' flag; do
+while getopts 'b:c:o:u:X:K:rism' flag; do
   case "${flag}" in
     b) bam="${OPTARG}" ;;         # BAM file
-    c) barcodes="${OPTARG}" ;;    # Demultiplexing table for 4nt barcodes
-    6) barcodes2="${OPTARG}" ;;   # Demultiplexing table for 6nt barcodes
+    c) barcodes="${OPTARG}" ;;    # Demultiplexing table (for all lengths af sample tags)
     o) outdir="${OPTARG}" ;;      # Output directory for the counts
     X) SCRIPTSPATH="${OPTARG}" ;; # Where to find all the scripts for this workflow
     r) revcomp="${OPTARG}" ;;     # Reverse complement the barcodes
@@ -36,6 +33,10 @@ while getopts 'b:c:6:o:u:X:K:rism' flag; do
     *) usage ;;
   esac
 done
+
+if [[ ! -z "$barcodes" ]]; then
+    barcodes="-b ${barcodes}"
+fi
 
 if [[ -z "$outdir" ]]; then
   outdir='./process'
@@ -70,58 +71,36 @@ fi
 set -e
 
 # Modules
-echo "${bam}: Loading modules"
-module load samtools/1.9-foss-2017a
-module load python/2.7.13-foss-2017a
-module load biopython/1.70-foss-2017a-python-2.7.13
-module load python-levenshtein/0.12.0-foss-2017a-python-2.7.13
+# echo "${bam}: Loading modules"
+# module load samtools/1.9-foss-2017a
+# module load python/2.7.13-foss-2017a
+# module load biopython/1.70-foss-2017a-python-2.7.13
+# module load pysam/0.14.1-foss-2017a-python-2.7.13
+# module load python-levenshtein/0.12.0-foss-2017a-python-2.7.13
 
 prefix=$(basename $bam)
 prefix=${prefix/.bam/}
 
-# Extract to FASTQ
-echo "${bam}: Extracting to FASTQ"
-fastq=${bam/.bam/.fastq}
-samtools fastq $bam -0 $fastq
-
 # Match semi-random barcode format, demultiplex, and count the barcodes.
-echo "${fastq}: Demultiplexing and counting barcodes"
-if [[ -z "$barcodes2" ]]; then
-  ${SCRIPTSPATH}/barcodingQuantifier.py -f $fastq -o $outdir -b $barcodes $revcomp $spikedin $stringent
-else
-  ${SCRIPTSPATH}/barcodingQuantifier.py -f $fastq -o $outdir -b $barcodes -6 $barcodes2 $revcomp $spikedin $stringent
-fi
-unknown="${outdir}/unmatched.fastq"
-umcounts="${outdir}/unmatched_barcode_counts.txt"
+echo "${prefix}: Demultiplexing and counting barcodes"
+${SCRIPTSPATH}/barcodingQuantifier.py -f $bam -o $outdir $barcodes $revcomp $spikedin $stringent
 
 ##
 ## Merging very similar barcode sequences with vastly different abundances using barcodingHammingMerge.py would go somewhere here in the workflow.
 ## Currently such barcodes are kept separate and likely rejected when the count threshold is applied in the analysis afterwards.
 ##
 
-# Save space.
-echo "${prefix}: Compressing unmatched reads"
-gzip $unknown
-# echo "${fastq}: Re-compressing reads"
-# gzip $fastq
-# rm $fastq
-
-# Sort unmatched barcodes by count
-echo "${prefix}: Sorting unmatched barcodes by count"
-${SCRIPTSPATH}/sort_unmatched.R $umcounts
-rm $umcounts      # Prevents it from being pulled into the merge in the next step. The sorted version has a different suffix and won't be pulled in.
-
 # Merge sample-specific count tables into one collective table
 echo "${prefix}: Merging sample-specific count tables into one"
-${SCRIPTSPATH}/fileutilities.py T $outdir --dir _barcode_counts.txt | perl -e 'while(<>){~s/_barcode_counts$//;print}' | ${SCRIPTSPATH}/fileutilities.py P -i --merge outer no yes > ${outdir}/${prefix}_tmp.tsv
-head -n 1 ${outdir}/${prefix}_tmp.tsv | perl -e 'while(<>){~s/_\|\d+//g; print}' > ${outdir}/${prefix}_barcode_counts.tsv   # Clean up the header
-tail -n +2 ${outdir}/${prefix}_tmp.tsv >> ${outdir}/${prefix}_barcode_counts.tsv
-# ${SCRIPTSPATH}/fileutilities.py T $outdir --dir _barcode_counts.txt | ${SCRIPTSPATH}/fileutilities.py P --loop rm {abs}
-# rm ${outdir}/${prefix}_tmp.tsv
+${SCRIPTSPATH}/fileutilities.py T ${outdir}/${prefix} --dir _barcode-counts.txt | perl -e 'while(<>){~s/_barcode-counts$//;print}' | ${SCRIPTSPATH}/fileutilities.py P -i --appnd outer > ${outdir}/${prefix}_tmp.tsv
+head -n 1 ${outdir}/${prefix}_tmp.tsv | perl -e 'while(<>){~s/_\|\d+//g; print}' > ${outdir}/${prefix}_barcode-counts.tsv   # Clean up the header
+tail -n +2 ${outdir}/${prefix}_tmp.tsv >> ${outdir}/${prefix}_barcode-counts.tsv
+${SCRIPTSPATH}/fileutilities.py T $outdir --dir _barcode-counts.txt | ${SCRIPTSPATH}/fileutilities.py P --loop rm {abs}
+rm ${outdir}/${prefix}_tmp.tsv
 
 # Rename barcode column
-head -n 1 ${outdir}/${prefix}_barcode_counts.tsv | perl -e 'while(<>){~s/row_ID/barcode/;print}' > ${outdir}/tmp
-tail -n +2 ${outdir}/${prefix}_barcode_counts.tsv >> ${outdir}/tmp
-mv ${outdir}/tmp ${outdir}/${prefix}_barcode_counts.tsv
+head -n 1 ${outdir}/${prefix}_barcode-counts.tsv | perl -e 'while(<>){~s/row_ID/barcode/;print}' > ${outdir}/tmp
+tail -n +2 ${outdir}/${prefix}_barcode-counts.tsv >> ${outdir}/tmp
+mv ${outdir}/tmp ${outdir}/${prefix}_barcode-counts.tsv
 
 echo "${prefix}: Workflow finished!"

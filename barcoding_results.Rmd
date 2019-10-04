@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r pdfstart}
-pdf('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_old/results/YUMM17_barcodes.pdf', paper="a4")
+# pdf('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_barcode_tracing/analysis/YUMM17_barcoding_results.pdf', paper="a4")
 ```
 
 Some plots in this report are interactive, so be sure to hover your pointer over them.
@@ -57,11 +57,20 @@ getPalette <- colorRampPalette(brewer.pal(8, "Accent"))
 Load data.
 
 ```{r data}
-counts <- fread('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_old/data/counts.txt')
-counts[is.na(counts)] <- 0
-# Fix silly names...
-names(counts) <- sub('Rag', 'Rag-/-', names(counts))
+## EDIT HERE
+counts <- fread('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_barcode_tracing/reprocess/CD4MMANXX_7_20190322B_20190324_barcode-counts.tsv')
+summaries <- fread('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_barcode_tracing/reprocess/CD4MMANXX_7_20190322B_20190324/summary.txt')
 
+## EDIT HERE
+# Fix silly names...
+names(counts) <- sub('Rag-.-', 'Rag-/-', names(counts))
+names(summaries) <- c("row_ID", "CD4MMANXX_7_20190322B_20190324")
+
+# Plug any gaps from undetected barcodes.
+counts[is.na(counts)] <- 0
+summaries[is.na(summaries)] <- 0
+
+## EDIT HERE
 # Assign a numeric ID to barcodes by abundance in reference.
 counts[, bc_id := order(Y17_PCL_100k_D0_Repeat, decreasing=TRUE)]
 setkey(counts, bc_id)
@@ -73,6 +82,7 @@ cntCols <- 2:(length(counts)-1)
 Thresholds
 
 ```{r thresholds}
+## EDIT HERE
 count_thresh = 50
 abund_thresh <- 0.02
 ```
@@ -80,6 +90,7 @@ abund_thresh <- 0.02
 Set sample order.
 
 ```{r order}
+## EDIT HERE
 # Tidy up sample names.
 sampleNames <- c("Y17_PCL_100k_D0_Repeat",
                  'Y17_Repeat_NSG_402_UT', 'Y17_Repeat_NSG_405_UT', 'Y17_Repeat_NSG_407_UT', 'Y17_Repeat_NSG_410_UT',
@@ -174,6 +185,35 @@ all_tidy <- merge(all_tidy, samples_tidy, by.x="Sample", by.y="name")
 all_tidy[, Sample := factor(all_tidy$Sample, levels=sampleNames, ordered=TRUE)]
 setorder(all_tidy, Sample)
 rm(samples_tidy)
+```
+
+# Overview of the number of reads allocated per sample
+
+```{r}
+summaries <- melt(summaries, id.vars = "row_ID", variable.name = "file", value.name = "reads")
+summaries[, total := sum(.SD$reads), by=file]
+summaries[, rate := reads / total]
+names(summaries)[1] <- "sample"
+summaries <- summaries[reads > 0,]
+#summaries$file <- ordered(summaries$file, labels=sampleNames)
+
+clr <- getPalette(length(unique(summaries$sample)))
+names(clr) <- unique(summaries$sample)
+clr[c("bc-unmatched", "sample-unknown")] <- c("black", "grey35")
+
+ggplotly(
+  ggplot(summaries) +
+    geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="dodge") +
+    scale_fill_manual(values=clr) +
+    labs(title="Efficiency of barcode detection and sample demultiplication") +
+    gth + theme(axis.text.x = element_text(angle=0, hjust=0.5))
+)
+
+ggplot(summaries) +
+  geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="dodge") +
+  scale_fill_manual(values=clr) +
+  labs(title="Efficiency of barcode detection and sample demultiplication") +
+  gth + theme(legend.position = "right")
 ```
 
 # Number of reads and barcodes
@@ -400,5 +440,5 @@ all_tidy %>%
 
 
 ```{r pdfend}
-dev.off()
+# dev.off()
 ```

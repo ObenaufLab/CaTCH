@@ -413,6 +413,9 @@ def count_columns(flist=[None], colSep=["\t"]):
             f = open(file)
         while True:
             line = f.readline()
+            if len(line) == 0:
+                sys.stderr.write(file + "is empty!\n")
+                exit(1)
             # Skip comments.
             if line[0] != "#":
                 counts.append(len( tokenizer.split(line.rstrip()) ))
@@ -522,6 +525,8 @@ def get_columns(flist=[None], cols=[0], colSep=["\t"], header=False, index=None,
     try:
         flist.aliases[0]
     except AttributeError:
+        flist = FilesList(flist)
+    except IndexError:
         flist = FilesList(flist)
     # Parse.
     keyhead = None
@@ -680,6 +685,8 @@ def get_random_columns(flist, colSep=["\t"], k=1, header=False, index=None, merg
         flist.aliases[0]
     except AttributeError:
         flist = FilesList(flist)
+    except IndexError:
+        flist = FilesList(flist)
     # Get columns.
     for f, (myfile, myalias) in flist.enum():
         cols = []
@@ -732,6 +739,8 @@ def append_columns(flist, colSep=["\t"], header=False, index=None, merge=True, t
         flist.aliases[0]
     except AttributeError:
         flist = FilesList(flist)
+    except IndexError:
+        flist = FilesList(flist)
     # Determine how many columns each file has.
     numofcols = count_columns(flist, colSep=colSep)
     # Delegate fetching all the columns.
@@ -774,6 +783,8 @@ def merge_tables(flist, colSep=["\t"], header=False, index=0, merge=True, type='
     try:
         flist.aliases[0]
     except AttributeError:
+        flist = FilesList(flist)
+    except IndexError:
         flist = FilesList(flist)
     # Determine how many columns each file has.
     numofcols = count_columns(flist, colSep=colSep)
@@ -855,6 +866,8 @@ def dedup_columns(flist, cols=[0,1], colSep=["\t"], merge=True):
     try:
         flist.aliases[0]
     except AttributeError:
+        flist = FilesList(flist)
+    except IndexError:
         flist = FilesList(flist)
     # Determine how many columns each file has.
     numofcols = count_columns(flist, colSep=colSep)
