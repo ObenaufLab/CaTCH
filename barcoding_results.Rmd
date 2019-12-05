@@ -206,7 +206,8 @@ ggplotly(
     geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="dodge") +
     scale_fill_manual(values=clr) +
     labs(title="Efficiency of barcode detection and sample demultiplication") +
-    gth + theme(axis.text.x = element_text(angle=0, hjust=0.5))
+    gth + theme(axis.text.x = element_text(angle=0, hjust=0.5)),
+  dynamicTicks = TRUE
 )
 
 ggplot(summaries) +
@@ -317,7 +318,7 @@ p1 <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFill, group="A", l
          ggtitle(paste0("Barcodes with at least ", abund_thresh * 100,"% representation")) +
          gth + theme(panel.grid.major.x = element_blank(), legend.position="none")
 # Interactive version
-ggplotly( p1 )
+ggplotly( p1, dynamicTicks = TRUE )
 
 # Static version
 print( p1 )
@@ -339,7 +340,8 @@ ggplotly(
     geom_point(shape=16, size=1, alpha=0.6) +
     scale_colour_manual(values=treatCols) +
     ggtitle("Barcode Diversity") +
-    gth
+    gth,
+  dynamicTicks = TRUE
 )
 
 # Static version with labels.
