@@ -99,8 +99,8 @@ ${SCRIPTSPATH}/fileutilities.py T $outdir --dir _barcode-counts.txt | ${SCRIPTSP
 rm ${outdir}/${prefix}_tmp.tsv
 
 # Rename barcode column
-head -n 1 ${outdir}/${prefix}_barcode-counts.tsv | perl -e 'while(<>){~s/row_ID/barcode/;print}' > ${outdir}/tmp
-tail -n +2 ${outdir}/${prefix}_barcode-counts.tsv >> ${outdir}/tmp
-mv ${outdir}/tmp ${outdir}/${prefix}_barcode-counts.tsv
+head -n 1 ${outdir}/${prefix}_barcode-counts.tsv | perl -e 'while(<>){~s/row_ID/barcode/;print}' > ${outdir}/${prefix}_tmp
+tail -n +2 ${outdir}/${prefix}_barcode-counts.tsv >> ${outdir}/${prefix}_tmp
+mv ${outdir}/${prefix}_tmp ${outdir}/${prefix}_barcode-counts.tsv
 
 echo "${prefix}: Workflow finished!"
