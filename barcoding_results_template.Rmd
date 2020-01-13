@@ -1,5 +1,5 @@
 ---
-title: "Clone survival screens"
+title: "Clone survival screens - R8815"
 author: "Kimon Froussios"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
@@ -10,11 +10,15 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```
 
 ```{r pdfstart}
-# pdf('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_barcode_tracing/analysis/YUMM17_barcoding_results.pdf', paper="a4")
+# topdf = TRUE
+topdf = FALSE
+if (topdf){
+  pdf('/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R8815/analysis/R8815_barcoding_results.pdf', paper="a4")
+}
 ```
 
 Some plots in this report are interactive, so be sure to hover your pointer over them.
@@ -57,22 +61,14 @@ getPalette <- colorRampPalette(brewer.pal(8, "Accent"))
 Load data.
 
 ```{r data}
-## EDIT HERE
-counts <- fread('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_barcode_tracing/reprocess/CD4MMANXX_7_20190322B_20190324_barcode-counts.tsv')
-summaries <- fread('/Volumes/groups/obenauf/Kimon_Froussios/chris/YUMM17_barcode_tracing/reprocess/CD4MMANXX_7_20190322B_20190324/summary.txt')
-
-## EDIT HERE
-# Fix silly names...
-names(counts) <- sub('Rag-.-', 'Rag-/-', names(counts))
-names(summaries) <- c("row_ID", "CD4MMANXX_7_20190322B_20190324")
-
+counts <- fread('/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R8815/process/barcode-counts.txt')
+summaries <- fread('/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R8815/process/summary-counts.txt')
 # Plug any gaps from undetected barcodes.
 counts[is.na(counts)] <- 0
 summaries[is.na(summaries)] <- 0
 
-## EDIT HERE
 # Assign a numeric ID to barcodes by abundance in reference.
-counts[, bc_id := order(Y17_PCL_100k_D0_Repeat, decreasing=TRUE)]
+counts[, bc_id := order(day0, decreasing=TRUE)]
 setkey(counts, bc_id)
 
 # counts columns with counts
@@ -82,7 +78,6 @@ cntCols <- 2:(length(counts)-1)
 Thresholds
 
 ```{r thresholds}
-## EDIT HERE
 count_thresh = 50
 abund_thresh <- 0.02
 ```
@@ -90,18 +85,13 @@ abund_thresh <- 0.02
 Set sample order.
 
 ```{r order}
-## EDIT HERE
 # Tidy up sample names.
-sampleNames <- c("Y17_PCL_100k_D0_Repeat",
-                 'Y17_Repeat_NSG_402_UT', 'Y17_Repeat_NSG_405_UT', 'Y17_Repeat_NSG_407_UT', 'Y17_Repeat_NSG_410_UT',
-                 'Y17_Repeat_Rag-/-_421_UT', 'Y17_Repeat_Rag-/-_422_UT', 'Y17_Repeat_Rag-/-_423_UT', 'Y17_Repeat_Rag-/-_428_UT',
-                 'Y17_Repeat_BL6_414p1_UT', 'Y17_Repeat_BL6_416_UT', 'Y17_Repeat_BL6_417_UT', 'Y17_Repeat_BL6_475_UT',
-                 'Y17_Repeat_NSG_403_DT', 'Y17_Repeat_NSG_404_DT', 'Y17_Repeat_NSG_406_DT', 'Y17_Repeat_NSG_408_DT', 'Y17_Repeat_NSG_409_DT',
-                 'Y17_Repeat_Rag-/-_424_DT', 'Y17_Repeat_Rag-/-_425_DT', 'Y17_Repeat_Rag-/-_426_DT', 'Y17_Repeat_Rag-/-_427_DT', 'Y17_Repeat_Rag-/-_429_DT', 'Y17_Repeat_Rag-/-_430_DT',
-                 'Y17_Repeat_BL6_411_DT', 'Y17_Repeat_BL6_412_DT', 'Y17_Repeat_BL6_413_DT', 'Y17_Repeat_BL6_415_DT', 'Y17_Repeat_BL6_418_DT')
+sampleNames <- c("day0",  
+                 "L277_notreat",	"R277_notreat", "R279_notreat", "R282_notreat", "R288_notreat",
+                 "L286_treat", "L287_treat", "R281_treat", "R286_treat", "R287_treat")
 
 samples_tidy <- data.frame(name=factor(sampleNames, levels=sampleNames, ordered=TRUE), 
-                           treatment=c('ref', rep('UT', 12), rep('DT', 16)))
+                           treatment=c(rep('ref', 1), rep('UT', 5), rep('DT', 5)))
 ```
 
 Calculate proportions and tidy up the data format.
@@ -195,49 +185,56 @@ summaries[, total := sum(.SD$reads), by=file]
 summaries[, rate := reads / total]
 names(summaries)[1] <- "sample"
 summaries <- summaries[reads > 0,]
-#summaries$file <- ordered(summaries$file, labels=sampleNames)
+summaries$file <- ordered(summaries$file, labels=sampleNames)
 
 clr <- getPalette(length(unique(summaries$sample)))
 names(clr) <- unique(summaries$sample)
 clr[c("bc-unmatched", "sample-unknown")] <- c("black", "grey35")
 
-ggplotly(
-  ggplot(summaries) +
-    geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="dodge") +
-    scale_fill_manual(values=clr) +
-    labs(title="Efficiency of barcode detection and sample demultiplication") +
-    gth + theme(axis.text.x = element_text(angle=0, hjust=0.5)),
-  dynamicTicks = TRUE
-)
-
-ggplot(summaries) +
-  geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="dodge") +
-  scale_fill_manual(values=clr) +
-  labs(title="Efficiency of barcode detection and sample demultiplication") +
-  gth + theme(legend.position = "right")
+if (topdf){
+  print( 
+    ggplot(summaries) +
+      geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="dodge") +
+      scale_fill_manual(values=clr) +
+      labs(title="Efficiency of barcode detection and sample demultiplication") +
+      gth + theme(legend.position = "right")
+  )
+} else {
+  ggplotly(
+    ggplot(summaries) +
+      geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="dodge") +
+      scale_fill_manual(values=clr) +
+      labs(title="Efficiency of barcode detection and sample demultiplication") +
+      gth,
+    dynamicTicks = TRUE
+  )
+}
 ```
 
 # Number of reads and barcodes
 
 ```{r counts, fig.height=6}
 # Basic faceted barplot
-print ( 
-  ggplot(data=droplevels(count_summary[(Type != "top_Barcodes"), ]), aes(x=Sample, y=Count, fill=Type))  +
-          facet_grid(Type ~ ., scales = "free") +
-          geom_bar(stat='identity', width=0.7, size=0.2) +
-          scale_fill_manual(values = c(all_BCs = "mediumorchid2", 
-                                       fltr_BCs = "mediumorchid3", 
-                                       Reads= "darkgoldenrod2")) +
-          scale_y_continuous(expand = expand_scale(mult = c(0, .15)), limits = c(0, NA)) +
-          ggtitle("Total # of reads, and # of detected barcodes") +
-          gth + theme(legend.position = "none")
-)
+p1 <- ggplot(data=droplevels(count_summary[(Type != "top_Barcodes"), ]), aes(x=Sample, y=Count, fill=Type))  +
+            facet_grid(Type ~ ., scales = "free") +
+            geom_bar(stat='identity', width=0.7, size=0.2) +
+            scale_fill_manual(values = c(all_BCs = "mediumorchid2", 
+                                         fltr_BCs = "mediumorchid3", 
+                                         Reads= "darkgoldenrod2")) +
+            scale_y_continuous(expand = expand_scale(mult = c(0, .15)), limits = c(0, NA)) +
+            ggtitle("Total # of reads, and # of detected barcodes") +
+            gth + theme(legend.position = "none")
+
+# if (topdf){
+  print ( p1 )
+# } else {
+#   ggplotly( p1, dynamicTicks = TRUE )
+# }
 ```
 
 ```{r counts2, fig.height=6}
 # Basic faceted barplot
-print ( 
-  ggplot(data=droplevels(count_summary[(Type != "top_Barcodes"), ]), aes(x=Sample, y=Count, fill=Type))  +
+p1 <- ggplot(data=droplevels(count_summary[(Type != "top_Barcodes"), ]), aes(x=Sample, y=Count, fill=Type))  +
           facet_grid(Type ~ ., scales = "free") +
           geom_bar(stat='identity', width=0.7, size=0.2) +
           scale_fill_manual(values = c(all_BCs = "mediumorchid2", 
@@ -246,7 +243,11 @@ print (
           scale_y_continuous(expand = expand_scale(mult = c(0, .15)), limits = c(0, NA), trans='sqrt') +
           ggtitle("Total # of reads, and # of detected barcodes") +
           gth + theme(legend.position = "none")
-)
+# if (topdf){
+  print ( p1 )
+# } else {
+#   ggplotly( p1, dynamicTicks = TRUE )
+# }
 ```
 
 # Distribution of barcode abundances above threshold
@@ -254,8 +255,7 @@ print (
 Mind that the Y-axis scale is **logarithmic**, meaning the distributions are much more top-skewed than they appear.
 
 ```{r proportions}
-print(
-  all_tidy %>% 
+p1 <- all_tidy %>% 
     filter(count_Good) %>%
     ggplot(aes(x=Sample, y=Proportion)) +
       geom_violin(aes(fill=treatment), width=1) +
@@ -265,7 +265,12 @@ print(
       scale_fill_manual(values=treatCols) +
       ggtitle("Barcode abundances", subtitle=paste("for barcodes with at least", count_thresh, "reads")) +
   gth + theme(panel.grid.minor.y = element_line(colour='grey95'))
-)
+
+# if (topdf){
+  print ( p1 )
+# } else {
+#   ggplotly( p1, dynamicTicks = TRUE )
+# }
 ```
 
 # Barcode Complexity
@@ -317,13 +322,12 @@ p1 <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFill, group="A", l
          ylab("Individual barcode proportion") +
          ggtitle(paste0("Barcodes with at least ", abund_thresh * 100,"% representation")) +
          gth + theme(panel.grid.major.x = element_blank(), legend.position="none")
-# Interactive version
-ggplotly( p1, dynamicTicks = TRUE )
 
-# Static version
-print( p1 )
-
-rm(tmp)
+if (topdf){
+  print ( p1 )
+} else {
+  ggplotly( p1, dynamicTicks = TRUE )
+}
 ```
 
 Number of barcodes passing the counts threshold vs. number of barcodes passing the representation threshold.
@@ -331,32 +335,33 @@ Number of barcodes passing the counts threshold vs. number of barcodes passing t
 ```{r complexity_plots3}
 # The labels can create terrible clutter if the plot is small with lots of points. 
 # Plotly enables hover-over to get Sample info
-ggplotly(
-  ggplot(data=all_tidy %>% 
-                filter(count_Good) %>%
-                group_by(Sample) %>% 
-                summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)), 
-         aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, colour=Treatment)) +
-    geom_point(shape=16, size=1, alpha=0.6) +
-    scale_colour_manual(values=treatCols) +
-    ggtitle("Barcode Diversity") +
-    gth,
-  dynamicTicks = TRUE
-)
-
-# Static version with labels.
-print(
-  ggplot(data=all_tidy %>%
-                filter(count_Good) %>%
-                group_by(Sample) %>%
-                summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)),
-         aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, fill=Treatment)) +
-    geom_label_repel(colour="black", fill="white", size=3, direction="both", force=1, min.segment.length = 0) +
-    geom_point(shape=21) +
-    scale_fill_manual(values=treatCols) +
-    ggtitle("Barcode Diversity") +
-    gth
-)
+if (topdf){
+  print(
+    ggplot(data=all_tidy %>%
+                  filter(count_Good) %>%
+                  group_by(Sample) %>%
+                  summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)),
+           aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, fill=Treatment)) +
+      geom_label_repel(colour="black", fill="white", size=3, direction="both", force=1, min.segment.length = 0) +
+      geom_point(shape=21) +
+      scale_fill_manual(values=treatCols) +
+      ggtitle("Barcode Diversity") +
+      gth
+  )
+} else {
+  ggplotly(
+    ggplot(data=all_tidy %>% 
+                  filter(count_Good) %>%
+                  group_by(Sample) %>% 
+                  summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)), 
+           aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, colour=Treatment)) +
+      geom_point(shape=16, size=1, alpha=0.6) +
+      scale_colour_manual(values=treatCols) +
+      ggtitle("Barcode Diversity") +
+      gth,
+    dynamicTicks = TRUE
+  )
+}
 ```
 
 # Enrichment of top shared barcodes
@@ -424,7 +429,7 @@ top <- all_tidy %>%
   arrange(bc_id) %>%
   unique()
 
-all_tidy %>%
+p1 <- all_tidy %>%
   arrange(bc_id) %>%
   filter(bc_id %in% top$bc_id) %>%
   select(Sample, bc_id, Proportion) %>%
@@ -436,11 +441,23 @@ all_tidy %>%
           legend.position = "right",
           panel.background = element_rect(fill="white"),
           panel.grid.major = element_line(colour="grey95"))
+
+if (topdf){
+  print ( p1 )
+} else {
+  ggplotly( p1, dynamicTicks = TRUE )
+}
+```
+
+# Session Info
+
+```{r}
+sessionInfo()
 ```
 
 
-
-
 ```{r pdfend}
-# dev.off()
+if (topdf) {
+  dev.off()
+}
 ```
