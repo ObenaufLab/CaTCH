@@ -30,10 +30,10 @@ Libraries.
 ```{r libraries, result="hide", warning=FALSE}
 library(data.table)
 library(tidyverse)
-library(readxl)
 library(plotly)
 library(ggrepel)
 library(RColorBrewer)
+library(pheatmap)
 ```
 
 Plots' theme.
@@ -63,9 +63,15 @@ Load data.
 ```{r data}
 counts <- fread('/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R8815/process/barcode-counts.txt')
 summaries <- fread('/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R8815/process/summary-counts.txt')
+names(summaries) <- c('row_ID', 'CE83TANXX_7') # for already "melted" summary
+statsout = '/Volumes/groups/obenauf/Kimon_Froussios/chris/CE83TANXX_review/analysis/summary_114618.tsv'
+
 # Plug any gaps from undetected barcodes.
 counts[is.na(counts)] <- 0
 summaries[is.na(summaries)] <- 0
+
+# Get rid of barcodes not seen in the samples.
+counts <- counts[rowSums(counts[, 2:length(counts)]) != 0, ]
 
 # Assign a numeric ID to barcodes by abundance in reference.
 counts[, bc_id := order(day0, decreasing=TRUE)]
@@ -185,7 +191,7 @@ summaries[, total := sum(.SD$reads), by=file]
 summaries[, rate := reads / total]
 names(summaries)[1] <- "sample"
 summaries <- summaries[reads > 0,]
-summaries$file <- ordered(summaries$file, labels=sampleNames)
+# summaries$file <- ordered(summaries$file, labels=sampleNames)
 
 clr <- getPalette(length(unique(summaries$sample)))
 names(clr) <- unique(summaries$sample)
@@ -212,6 +218,11 @@ if (topdf){
 ```
 
 # Number of reads and barcodes
+
+```{r}
+fwrite(pivot_wider(count_summary[(Type != "top_Barcodes"), ], names_from='Type', values_from='Count'),
+			 file=statsout, sep="\t", quote=FALSE)
+```
 
 ```{r counts, fig.height=6}
 # Basic faceted barplot
@@ -250,6 +261,13 @@ p1 <- ggplot(data=droplevels(count_summary[(Type != "top_Barcodes"), ]), aes(x=S
 # }
 ```
 
+# Correlations 
+
+```{r}
+pheatmap( cor(as.matrix(counts[, ! names(counts) %in% c('barcode', 'bc_id'), with=FALSE], rownames=counts$bc_id)),
+					cluster_rows = FALSE, cluster_cols = FALSE)
+```
+
 # Distribution of barcode abundances above threshold
 
 Mind that the Y-axis scale is **logarithmic**, meaning the distributions are much more top-skewed than they appear.
@@ -262,9 +280,10 @@ p1 <- all_tidy %>%
       geom_boxplot(fill="white", width=0.1, outlier.colour="transparent") +
       geom_hline(yintercept = abund_thresh, linetype='dotted') +
       scale_y_log10() +
+			annotation_logticks(base=10, sides='lr') +
       scale_fill_manual(values=treatCols) +
       ggtitle("Barcode abundances", subtitle=paste("for barcodes with at least", count_thresh, "reads")) +
-  gth + theme(panel.grid.minor.y = element_line(colour='grey95'))
+  		gth
 
 # if (topdf){
   print ( p1 )
@@ -412,8 +431,9 @@ for (bc in sharedBarcodes$bc_id) {
       geom_point(data=all_tidy[(bc_id == bc), ], fill="orange", size=2, shape=23) +
       scale_y_log10() +
       scale_fill_manual(values=treatCols) +
+      annotation_logticks(base=10, sides='lr') +
       ggtitle(paste("Abundance of barcode",bc)) +
-      gth + theme(panel.grid.minor.y = element_line(colour='grey95'))
+      gth
   )
 }
 ```
@@ -436,7 +456,7 @@ p1 <- all_tidy %>%
   mutate(bc_id=factor(as.character(bc_id), levels=as.character(top$bc_id))) %>%
   ggplot(aes(x=Sample, y=bc_id, fill=Proportion)) +
     geom_tile(colour='transparent') +
-    scale_fill_gradient(low="transparent", high="midnightblue") +
+    # scale_fill_gradient(low="transparent", high="midnightblue") +
     theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
           legend.position = "right",
           panel.background = element_rect(fill="white"),
