@@ -109,7 +109,7 @@ def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args
             found = False       # flag to report whether any of the tag lengths resulted in a match
             sampleTag=None
             for k in sampleTagLens:                   # Flexible length.
-                sampleTag = myread[(start - gtl - k):(start - gtl)]  # The sample tag is either immediately before the gentype tag, or not present.
+                sampleTag = myread[(start - gtl - k):(start - gtl)].upper()  # The sample tag is either immediately before the gentype tag, or not present.
                 if sampleTag in bc:
                     found = True
                     bcStats.update([bc[sampleTag]])             # total hits for the sample
@@ -126,6 +126,7 @@ def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args
     else:
         return False
 
+# Parse BAM
 if not os.path.exists(os.path.join(args.outdir, prefix)):
     os.mkdir(os.path.join(args.outdir, prefix))
 with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Checking for reference sequences in the header has to be disabled for unaligned BAM.
@@ -136,10 +137,11 @@ with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Chec
                 if recognize(bc_pattern, record, unknown_sample):
                     pass  # Counters are updated by the function directly, there is no additional logic to implement.
                 elif recognize(empty_pattern, record, unknown_sample) :
-                    pass
+                    pass  # as above
                 elif args.spikein and recognize(spike_pattern, record, unknown_sample):
-                    pass
+                    pass  # as above
                 else :
+                    # None of the patterns has matched
                     bcStats.update([bc["unmatched"]])
                     ##library[bc["unmatched"]].update([barcode])
                     unmatched_bc.write(record)
