@@ -3,8 +3,7 @@
 """fileutilities.py
 
 Author: Kimon Froussios
-Compatibility tested: python 3.5.2
-Last reviewed: 10/05/2019
+Last reviewed: 20/02/2020
 
 This module is a solution for Frequently Performed Generic Tasks that involve
 multiple files:
@@ -211,7 +210,7 @@ def make_names(items, parameters):
     return outfiles
 
 
-def do_foreach(flist, comm, comments=False, progress=True, out=(None,None,None), log=False):
+def do_foreach(flist, comm, progress=True, out=(None,None,None), log=False):
     """Execute an arbitrary command for each of the listed files.
 
     Enables executing a shell command over a range of items, by inserting the
@@ -233,11 +232,11 @@ def do_foreach(flist, comm, comments=False, progress=True, out=(None,None,None),
                     {dir} : absolute path of the file's directory.
                     {val} : the actual value specified as target
                     {bas} : the basename of the file, without the last extension.
+                    {cor} : the basename of the file, without any extensions.
                     {alias}: the alias for the file, if iterating through a FilesList.
                     Placeholders can be nested, to allow nested calls of fileutilities:
                     i.e. {{abs}}. A layer of nesting is peeled off each time the function is called,
                     until the placeholders are allowed to be evaluated.
-        comments(bool): Print commented call details to STDOUT. (Default False)
         progress(bool): Show start and completion of iterations on STDERR.
                     (Default True)
         out(str,str,str): The first element is the output directory, the second
@@ -255,16 +254,18 @@ def do_foreach(flist, comm, comments=False, progress=True, out=(None,None,None),
         for c in comm:
             # Evaluate placeholders, if they are not nested.
             (mypath, mybase) = os.path.split(str(myfile))
-            c = re.sub(r"(?<!\{){abs}(?!\})", str(myfile), c)
-            c = re.sub(r"(?<!\{){dir}(?!\})", mypath, c)
-            c = re.sub(r"(?<!\{){val}(?!\})", mybase, c)
-            c = re.sub(r"(?<!\{){bas}(?!\})", os.path.splitext(mybase)[0], c)
-            c = re.sub(r"(?<!\{){ali}(?!\})", str(myalias), c)
+            c = re.sub(r"(?<!\{){abs}(?!\})", str(myfile), c)                   # absoplute full path to file
+            c = re.sub(r"(?<!\{){dir}(?!\})", mypath, c)                        # absolute path of directory
+            c = re.sub(r"(?<!\{){val}(?!\})", mybase, c)                        # filename
+            c = re.sub(r"(?<!\{){bas}(?!\})", os.path.splitext(mybase)[0], c)   # filename minus last extension
+            c = re.sub(r"(?<!\{){cor}(?!\})", mybase.split('.')[0], c)          # filename minus all extensions
+            c = re.sub(r"(?<!\{){ali}(?!\})", str(myalias), c)                  # custom or automatic alias
             # Peel off a layer of nesting for the remaining placeholders and flags.
             c = c.replace('{{abs}}', '{abs}')
             c = c.replace('{{dir}}', '{dir}')
             c = c.replace('{{val}}', '{val}')
             c = c.replace('{{bas}}', '{bas}')
+            c = c.replace('{{cor}}', '{cor}')
             c = c.replace('{{ali}}', '{ali}')
             c = c.replace(',-', '-')
             # This argument is ready to go now.
@@ -273,29 +274,18 @@ def do_foreach(flist, comm, comments=False, progress=True, out=(None,None,None),
         if outfiles:
             outstream = open(outfiles[i], 'w')
         # Verbose stuff.
-        try:
-            see = " ".join(command)
-            if log:
-                ml.log_message(message=see, logfile="./subcommands.log")
-            if comments and out == (None,None):
-                outstream.write(ml.infostring("CWD: "+ os.getcwd() +"\tDO: "+ see))
-            if progress:
-                sys.stderr.write(ml.infostring("DO: "+ see))
-        except IOError:
-            pass
+        see = " ".join(command)
+        if log:
+            ml.log_message(message=see, logfile="./commands.log")
+        if progress:
+            sys.stderr.write(ml.infostring("DO: "+ see))
         # Do the thing.
         subprocess.call(" ".join(command), stdout=outstream, shell=True)
-        # Optionally identify iteration.
-        try:
-            if comments and out == (None,None):
-                outstream.write(ml.infostring("Finished: "+ str(myalias) +"\n"))
-            if progress:
-                sys.stderr.write(ml.infostring("Finished: "+ str(myalias) +"\n"))
-        except IOError:
-            pass
-        finally:
-            if outfiles:
-                outstream.close()
+        # More verbose stuff.
+        if progress:
+            sys.stderr.write(ml.infostring("Finished: "+ str(myalias) +"\n"))
+        if outfiles:
+            outstream.close()
 
 
 def swap_strFiles(flist, insep=[","], outsep="\t"):
@@ -376,7 +366,7 @@ def prepare_df(df, myalias="", keyCol=None, keyhead="row_ID", header=False, cols
         keyhead = "row_ID"
     if keyCol is not None:
         # Add index without dropping it, so as not to affect column positions.
-        df.set_index(df.columns.values.tolist()[keyCol], inplace=True, drop=False)
+        df.set_index(df.columns.values.tolist()[keyCol], inplace=True, drop=False, verify_integrity=True)
         df.index.name = str(keyhead)
     # Make custom column labels, based on alias and column position.
     if not cols:
@@ -413,9 +403,6 @@ def count_columns(flist=[None], colSep=["\t"]):
             f = open(file)
         while True:
             line = f.readline()
-            if len(line) == 0:
-                sys.stderr.write(file + "is empty!\n")
-                exit(1)
             # Skip comments.
             if line[0] != "#":
                 counts.append(len( tokenizer.split(line.rstrip()) ))
@@ -427,7 +414,7 @@ def count_columns(flist=[None], colSep=["\t"]):
 
 
 def get_valuesSet(flist=[None], axis='r', index=0, filter='a', colSep=["\t"]):
-    """"List the set of different values in the column(s)/row(s).
+    """List the set of different values in the column(s)/row(s).
 
     Args:
         flist: A list of FilesList of files.
@@ -453,6 +440,8 @@ def get_valuesSet(flist=[None], axis='r', index=0, filter='a', colSep=["\t"]):
     try:
         flist.aliases[0]
     except AttributeError:
+        flist = FilesList(flist)
+    except IndexError:
         flist = FilesList(flist)
     # Main part of this function.
     results = []
@@ -510,7 +499,8 @@ def get_columns(flist=[None], cols=[0], colSep=["\t"], header=False, index=None,
         merge(bool): Concatenate results from all files into a single
                     dataframe. If False, a list of dataframes is returned
                     instead. (Default True).
-        index(int): Column to be used as row index for merging. (Default None)
+        index[int]: Column(s) to be used as row index.
+                    If multiple values, must match number of files. (Default None)
     Returns:
         [pandas.DataFrame]: List of DataFrames. If merge=True, only the
                     first element will be populated.
@@ -535,8 +525,9 @@ def get_columns(flist=[None], cols=[0], colSep=["\t"], header=False, index=None,
         # for problematic cases. As flexibility requirements increased, using the
         # pandas parser became too opaque and difficult to maintain,
         # so now all cases are delegated to mine.
+
         df = get_columns_manual(myfile, cols=cols, colSep=colSep, header=header,
-                                        alias=myalias, index=index)
+                                        alias=myalias, index=None if not index else index[min(f, len(index) - 1)]) # accommodate None or one value for all files or one value per file
         if not keyhead:
             keyhead = df.index.name
         result.append(df)
@@ -545,7 +536,6 @@ def get_columns(flist=[None], cols=[0], colSep=["\t"], header=False, index=None,
         result = [pd.concat(result, axis=1, join='outer', ignore_index=False, sort=False), ]
         result[0].index.name = keyhead
     return result
-
 
 # Helper function
 def get_columns_manual(file=None, cols=[0], colSep=["\t"], header=False, index=None, alias=None):
@@ -586,6 +576,20 @@ def get_columns_manual(file=None, cols=[0], colSep=["\t"], header=False, index=N
         f = open(file)
     if alias is None:
         alias = FilesList.autoalias(file)
+    # Expand column ranges
+    expandedcols = []
+    for c in cols:
+        v = str(c).split(":")
+        if len(v) == 1:
+            try:
+                expandedcols.append(int(v[0]))
+            except ValueError:
+                expandedcols.append(labels.index(v[0]))
+        else:
+            try:
+                expandedcols.extend(list(range(int(v[0]), int(v[1]) + 1)))
+            except TypeError:
+                expandedcols.extend(list(range(labels.index(v[0]), labels.index(v[1]) + 1)))
     # Import data.
     keyhead = None
     values = []
@@ -606,19 +610,6 @@ def get_columns_manual(file=None, cols=[0], colSep=["\t"], header=False, index=N
                 keyhead = str(fields[index])
             # Get columns.
             selection = []
-            expandedcols = []
-            for c in cols:
-                v = str(c).split(":")
-                if len(v) == 1:
-                    try:
-                        expandedcols.append(int(v[0]))
-                    except ValueError:
-                        expandedcols.append(labels.index(v[0]))
-                else:
-                    try:
-                        expandedcols.extend(list(range(int(v[0]), int(v[1]) + 1)))
-                    except TypeError:
-                        expandedcols.extend(list(range(labels.index(v[0]), labels.index(v[1]) + 1)))
             for i in expandedcols:
                 try:
                     selection.append(fields[i])
@@ -641,8 +632,8 @@ def get_columns_manual(file=None, cols=[0], colSep=["\t"], header=False, index=N
     df.astype(str, copy=False)   		# Uniform string type is simplest and safest.
     df = prepare_df(df, myalias=alias, keyCol=index, header=header, cols=expandedcols,
                     keyhead=keyhead, appendNum=True if len(expandedcols)>1 else False)
-    if index is not None:
-        df.drop(alias+"_|my_garbage_label_row_key", 1, inplace=True)
+    if alias+"_|my_garbage_label_row_key" in df.columns:
+            df.drop(alias+"_|my_garbage_label_row_key", 1, inplace=True)
     return df
 
 
@@ -662,7 +653,8 @@ def get_random_columns(flist, colSep=["\t"], k=1, header=False, index=None, merg
         colSep[str]: A list of characters used as field separators.
                     (Default ["\t"])
         header(bool): Strip column headers. (Default False)
-        index(int): Column to use as row index for merging. (Default None)
+        index[int]: Column(s) to be used as row index for merging.
+                    If multiple values, must match number of files. (Default None)
         merge(bool): Concatenate results from all files into a single
                     dataframe. If False, a list of dataframes is returned
                     instead. (Default True).
@@ -703,7 +695,7 @@ def get_random_columns(flist, colSep=["\t"], k=1, header=False, index=None, merg
         if (not keyhead) and header and (index is not None):
             keyhead = str(df.iloc[0,index])
         # Adjust row and column labels.
-        df = prepare_df(df, myalias=myalias, keyCol=index, header=header, keyhead=keyhead,
+        df = prepare_df(df, myalias=myalias, keyCol=None if not index else index[min(f, len(index) - 1)], header=header, keyhead=keyhead,
                         appendNum=True if k>1 else False)
         # Slice the part I need.
         df = df.iloc[:,cols]
@@ -725,9 +717,9 @@ def append_columns(flist, colSep=["\t"], header=False, index=None, merge=True, t
         flist: A list/FilesList of files to combine.
         colSep[str]: A list of characters used as field delimiters.
                     (Default ["\t"])
-        header(bool): First non-comment line as column labels. (Default False)
-        index(int): Column to use as row index (same in all files).
-                    (Default None)
+        header(bool): First non-comment line are column labels to be discasrded. (Default False)
+        index[int]: Column(s) to be used as row index for merging.
+                    If multiple values, must match number of files. (Default None)
                     If None, the number of rows can differ between files and will be
                     padded (outer) or truncated (inner), otherwise the row number must
                     be the same in all files.
@@ -741,38 +733,45 @@ def append_columns(flist, colSep=["\t"], header=False, index=None, merge=True, t
         flist = FilesList(flist)
     except IndexError:
         flist = FilesList(flist)
-    # Determine how many columns each file has.
-    numofcols = count_columns(flist, colSep=colSep)
-    # Delegate fetching all the columns.
-    data = []
+    numofcols = count_columns(flist, colSep=colSep) # Determine how many columns each file has.
+    data = list()
     keyhead = None
     for f, (myfile, myalias) in flist.enum():
         # List the columns and remove the index one from among them.
-        cols = [i for i in range(0,numofcols[f]) if i != index]
-        df =get_columns(FilesList(files=[myfile], aliases=[myalias]), cols=cols,
+        cols = None
+        if index:
+            cols = [i for i in range(0, numofcols[f]) if i != index[min(f, len(index) - 1)]]
+        else:
+            cols = [i for i in range(0, numofcols[f])]
+        # Delegate fetching all the columns.
+        df = get_columns(FilesList(files=[myfile], aliases=[myalias]), cols=cols,
                      colSep=colSep, header=header, merge=False, index=index)[0]
+        if index is not None:
+            # Then the first value of the row index is the name of the index column and its value may differ across the tables.
+            # This messes up merging. So ensure they all have the same value.
+            if f == 0:
+                keyhead = df.index[0]
+            else:
+                x = df.index.tolist()
+                x[0] = keyhead
+                df.index = x
         data.append( df )
-    # Merge. Row indexes will have been assigned by get_columns(), if applicable.
-    keyhead = data[0].index.name
     result = pd.concat(data, axis=1, join=type, ignore_index=False, sort=False)
-    result.index.name = keyhead
     return result
 
 
-def merge_tables(flist, colSep=["\t"], header=False, index=0, merge=True, type='outer', saveHeader=False, dedup=True):
+def merge_tables(flist, colSep=["\t"], header=False, index=[0], merge=True, type='outer', saveHeader=False, dedup=True):
     """Incrementally merge tables.
 
 	Join the first two files and then join the third file to the merged first two, etc.
-	For assymetric joins (left or right) the order of files in flist can change the outcome.
-	For symmetric joins (inner or outter) the order of files should not change the outcome.
 
     Args:
         flist: A list/FilesList of files to combine.
         colSep[str]: A list of characters used as field delimiters.
                      (Default ["\t"])
         header(bool): Crop first non-comment line as column labels. (Default False)
-        index(int): Column to use as row index (same in all files).
-                    (Default 0)
+        index[int]: Column(s) to be used as row index for merging.
+                    If multiple values, must match number of files. (Default [0]])
         type(str): 'left', 'right', 'outer' or 'inner' merge. (Default outer)
         saveHeader(bool): Exclude the first row from sorting upon merging. (False)
                           Necessary when the header is not to be cropped.
@@ -794,7 +793,16 @@ def merge_tables(flist, colSep=["\t"], header=False, index=0, merge=True, type='
         # List the columns and remove the index one from among them.
         cols = [i for i in range(0,numofcols[f])]
         df = get_columns(FilesList(files=[myfile], aliases=[myalias]), cols=cols,
-                        colSep=colSep, header=header, merge=False, index=index)[0]
+                        colSep=colSep, header=header, merge=False, index=[index[min(f, len(index) - 1)]])[0]
+        if index is not None:
+            # Then the first value of the row index is the name of the index column and its value may differ across the tables.
+            # This messes up merging. So ensure they all have the same value.
+            if f == 0:
+                keyhead = df.index[0]
+            else:
+                x = df.index.tolist()
+                x[0] = keyhead
+                df.index = x
         if (f == 0):
             result = df
         else:
@@ -804,18 +812,20 @@ def merge_tables(flist, colSep=["\t"], header=False, index=0, merge=True, type='
                                 left_index=True, right_index=True, how="outer")
                 result = pd.concat([hnew, pd.merge(left=result.iloc[1:,:], right=df.iloc[1:,:], how=type, on=None,
                                                    left_index=True, right_index=True,
-                                                   sort=False, suffixes=('','_'+ myalias))],
+                                                   sort=False, suffixes=('','_'+ myalias),
+                                                   validate="one_to_one")],
                                     axis=0, ignore_index=False, sort=False)
             else:
                 result = pd.merge(left=result, right=df, how=type, on=None,
                                   left_index=True, right_index=True,
-                                  sort=False, suffixes=('','_'+ myalias))
+                                  sort=False, suffixes=('','_'+ myalias),
+                                  validate="one_to_one")
     # In addition to the new row_ID columns, the index column was kept for each table. Drop them as redundant.
-    # If the index columns are not exact duplicates (due to gappy rows),
-    # dedup_columns can be used afterwards on the merged file).
+    index_cols = [col for col in result.columns if '_|' + str(index) in col]
+    result.drop(columns=index_cols, inplace=True)
     if dedup:
-        index_cols = [col for col in result.columns if '_|' + str(index) in col]
-        result.drop(columns=index_cols, inplace=True)
+        # Look for additional columns with identical content and drop them too.
+        result = result.drop(columns=getDuplicateColumns(result))
     return result
 
 
@@ -830,7 +840,7 @@ def getDuplicateColumns(df):
     Args:
     	df: Dataframe object
     Returns:
-        List of columns whose contents are redudnant (one occurence will of each will not be included in the list).
+        List of columns whose contents are redudnant (one occurence of each will not be included in the list).
     '''
     duplicateColumnNames = set()
     # Iterate over all the columns in dataframe
@@ -867,8 +877,6 @@ def dedup_columns(flist, cols=[0,1], colSep=["\t"], merge=True):
         flist.aliases[0]
     except AttributeError:
         flist = FilesList(flist)
-    except IndexError:
-        flist = FilesList(flist)
     # Determine how many columns each file has.
     numofcols = count_columns(flist, colSep=colSep)
     # Delegate fetching all the columns.
@@ -904,7 +912,8 @@ def get_crosspoints(flist, cols=[0], rows=[0], colSep=["\t"], header=False, inde
         cols[int]: List of columns.
         rows[int]: List of rows.
         header(bool): Whether there is a header line (False).
-        index(int): Which column has the row labels (None).
+        index[int]: Column(s) to be used as row index for merging.
+                    If multiple values, must match number of files. (Default None)
         merge(bool): Merge results into single table (True).
     Returns:
         [pandas.DataFrame]:
@@ -1088,7 +1097,7 @@ class FilesList(list):
         self.aliases.append(myalias)
         self.aliases = autonumerate(self.aliases)
 
-    def populate_from_files(self, myfiles, colSep="\t", verbatim=True):
+    def populate_from_files(self, myfiles, colSep="\t", verbatim=True, alias_verbatim=True):
         """Parse the list of files from one or multiple text files.
 
         Read in multiple lists of files from text and append them to the
@@ -1139,10 +1148,11 @@ class FilesList(list):
         if not verbatim:
             paths = expand_fpaths(paths)
         self.extend(paths)
-        self.aliases = autonumerate(self.aliases)
+        if not alias_verbatim:
+            self.aliases = autonumerate(self.aliases)
         return self
 
-    def populate_from_directories(self, dirpaths, patterns=None, verbatim=True):
+    def populate_from_directories(self, dirpaths, patterns=None, verbatim=True, alias_verbatim=True):
         """Get files based on naming patterns from within a list of directories.
 
         Useful for selecting among files that follow a naming convention. The
@@ -1235,107 +1245,62 @@ def main(args):
 
     """
     # Organize arguments and usage help:
-    parser = argparse.ArgumentParser(description="Provide INPUTTYPE and TARGETs \
-     *before* providing any of the other parameters. This is due to many \
-    parameters accepting an indefinite number of values. Only one task at a time.")
+    parser = argparse.ArgumentParser(description="Provide INPUTTYPE and TARGETs *before* providing any of the other parameters. This is due to many parameters accepting an indefinite number of values. Only one task at a time.")
 
     # Input/Output.
     parser.add_argument('INPUTTYPE', type=str, choices=['L','T','D','P'],
-                                help=" Specify the type of the TARGETs: \
-                                'T' = The actual input filess. \
-                                'L' = Text file(s) listing the input files. \
-                                'P' = Get list of input files from STDIN pipe. \
-                                'D' = Input data directly from STDIN pipe. \
-                                ('D' is compatible with only some of the functions)")
+                                help=" Specify the type of the TARGETs: 'T' = The actual input filess. 'L' = Text file(s) listing the input files. 'P' = Get list of input files from STDIN pipe. 'D' = Input data directly from STDIN pipe. ('D' is compatible with only some of the functions)")
     parser.add_argument('TARGET', type=str, nargs='*',
-                                help=" The targets, space- or comma-separated. Usually files. \
-                                Look into the specific task details below for special uses. \
-                                Do not specify with INPUTTYPE 'P' or 'D'.")
+                                help=" The targets, space- or comma-separated. Usually files. Look into the specific task details below for special uses. Do not specify with INPUTTYPE 'P' or 'D'.")
     parser.add_argument('-O','--out', type=str, nargs=3,
-                                help=" Send individual outputs to individual files instead of \
-                                merging them to STDOUT. Output files will be like \
-                                <out[0]>/<out[1]>target<out[2]>, where target is stripped of \
-                                any directory path and its outermost file extension.")
+                                help=" Send individual outputs to individual files instead of merging them to STDOUT. Output files will be like <out[0]>/<out[1]>target<out[2]>, where target is stripped of any directory path and its outermost file extension.")
     # Parameters.
     parser.add_argument('-L','--log', action='store_true',
-                                help=" Log this command to ./commands.log.")
-    parser.add_argument('-c','--comments', action='store_true',
-                                help=" Include commented info to STDOUT or files. (Default don't include)")
+                                help=" Log subcommands to ./commands.log.")
     parser.add_argument('-C','--STDERRcomments', action="store_false",
-                                help=" Do NOt show info in STDERR. (Default show)")
+                                help=" Do NOT show info in STDERR. (Default show)")
     parser.add_argument('-s','--sep', type=str, default=["\t"], nargs='+',
-                                help=" A list of input field separators. The first value \
-                                will be used for all output. (Default \\t, bash syntax for tab: $'\\t').")
+                                help=" A list of input field separators. The first value will be used for all output. (Default \\t, bash syntax for tab: $'\\t').")
     parser.add_argument('-l','--labels', action='store_true',
                                 help=" Discard column headers (first content line) in input files. (Default do not discard)")
     parser.add_argument('-r','--relabel', action='store_false',
                                 help=" Do not create new column headers that reflect the origin of the columns. (Default create)")
     parser.add_argument('-i','--index', action='store_true',
-                                help=" Use column 0 as row index. The index will always be included in the output. (Default no index)")
+                                help=" Use --idxCol as row index. The index will always be included in the output. (Default no index)")
+    parser.add_argument('-I', '--idxCol', type=int, nargs='+', default=[0],
+                                help=" If --index, the column(s) specified here will be used as the index. Either one value to be used for all the files, or exactly one value per file. (Default 0)")
     parser.add_argument('-M','--metadata', type=int, default=0,
-                                help=" Number of metadata lines at the \
-                                beginning of input data (Default 0). Metadate will be read separately \
-                                and re-added verbatim into the output.")
+                                help=" Number of metadata lines at the beginning of input data (Default 0). Metadata will be read separately and re-added verbatim into the output.")
     parser.add_argument('-R','--expand_ranges', action='store_true',
-                                help=" If numeric ranges exist among the targets expand them as individual vlaues. \
-                                Ranges must be in from:to format, inclusive of both end values. (Default False)")
+                                help=" If numeric ranges exist among the targets expand them as individual vlaues. Ranges must be in from:to format, inclusive of both end values. (Default False)")
     parser.add_argument('-V','--verbatim', action='store_true',
                                 help=" Preserve the target values from a list file, do not try to expand them into absolute paths. (Default impute absolute paths)")
     # General tasks.
     parser.add_argument('--dir', type=str, nargs='*',
-                                help=" List the contents of the target paths. \
-                                Full absolute file paths are returned. Each file is also given an alias. \
-                                Supplying an optional list of regex patterns enables filtering of the result.")
+                                help=" List the contents of the target paths. Full absolute file paths are returned. Each file is also given an alias. Supplying an optional list of regex patterns enables filtering of the result.")
     parser.add_argument('--link', type=str, nargs='+',
-                                help=" Create symbolic links for the targets into the specified directory. \
-                                Any additional values are used as respective names for the links, one for one, \
-                                otherwise the aliases or basenames will be used, enumerated when necessary.")
+                                help=" Create symbolic links for the targets into the specified directory. Any additional values are used as respective names for the links, one for one, otherwise the aliases or basenames will be used, enumerated when necessary.")
     parser.add_argument('--loop', type=str, nargs='+',
-                                help=" Repeat the specified shell command for each target value. \
-                                Available PLACEHOLDERS to insert the targets into the commands: \
-                                {abs} full path, {dir} path of directory portion, {val} target value such as filename, \
-                                {bas} basename (filename minus outermost extension), {ali} file alias. \
-                                Flags intended for the nested command should be preceded \
-                                by a ',' sign like this: ',-v'. Recursive calls to fileutilities.py are possible by \
-                                nesting the placeholders and escapes: i.e. {{abs}}, ,,-v. One layer is peeled off \
-                                with each call to fileutilities loop. The placeholders will take the values \
-                                of the targets of the respectively nested call.")
+                                help=" Repeat the specified shell command for each target value. Available PLACEHOLDERS to insert the targets into the commands: {abs} full path, {dir} path of directory portion, {val} target value such as filename, {bas} basename (filename minus outermost extension), {cor} filename core (all extensions removed), {ali} file alias. Flags intended for the nested command should be preceded by a ',' like this: ',-v'. Recursive calls to fileutilities.py are possible by nesting the placeholders and escapes: i.e. {{abs}}, ,,-v. One layer is peeled off with each call to fileutilities loop. The placeholders will take the values of the targets of the respectively nested call.")
     # Delimited file tasks.
     parser.add_argument('--concat', type=str,
-                                help="Create an X-separated list out of the target values, where X is the string specified as argument here. \
-                                Useful for creating comma-separated lists of files.")
+                                help="Create an X-separated list out of the target values, where X is the string specified as argument here. Useful for creating comma-separated lists of files.")
     parser.add_argument('--swap', type=str,
-                                help=" Replace all occurrences of the --sep values with the value supplied here.\
-                                ** Bash syntax for tab: $'\\t'. Compatible with 'D' as INPUTTYPE.")
+                                help=" Replace all occurrences of the --sep values with the value supplied here. ** Bash syntax for tab: $'\\t'. Compatible with 'D' as INPUTTYPE.")
     parser.add_argument('--cntcols', action='store_true',
-                                help="Count the number of fields in the first row of each target file.")
+                                help=" Count the number of fields in the first row of each target file.")
     parser.add_argument('--cols', nargs='+',
-                                help="Extract the specified columns (named or 0-indexed) from each target. \
-                                Column ranges in x:y format closed at both ends. \
-                                Negative indices must be escaped first: \-1. Compatible with 'D' as INPUTTYPE.")
+                                help=" Extract the specified columns (named or 0-indexed) from each target. Column ranges in x:y format closed at both ends. Negative indices must be escaped first: \-1. Compatible with 'D' as INPUTTYPE.")
     parser.add_argument('--rndcols', type=int,
-                                help="Randomly select this many columns from the target files. \
-                                With --index, the index column will not be part of the random selection.")
-    parser.add_argument('--appnd', type=str,
-                                help="Append all the columns from same-length target files into a single table. \
-                                Can be 'outer' or 'inner' join. If index is used, the values must be unique \
-                                within each file.")
+                                help="Randomly select this many columns from the target files. With --index, the index column will not be part of the random selection.")
+    parser.add_argument('--appnd', action='store_true',
+                                help="Add all the columns from the target files into a single table (via outer join). If index is used, the values must be unique within each file.")
     parser.add_argument('--merge', nargs=3, type=str,
-                                help="Merge table files. Index may contain duplicates and files may differ in dimensions. \
-                                The first column of each file will be used as row index to merge on regardless of -i flag. \
-                                First argument is type: 'left', 'right', 'inner', 'outer'. \
-								Second argument is preserve first row: 'yes', 'no' (because merge sorts rows) \
-								Third argument is deduplicate: 'yes', 'no' (index columns get repeated for each file. \
-                                For very large tables, best don't deduplicate, and use --mrgdups on the output). \
-                                For left/right joins, the order of files affects the result.")
+                                help="Merge table files. The first column of each file will be used as row index regardless of -i flag status. First argument is join type: 'left', 'right', 'inner', 'outer'. Second argument is preserve first header row: 'yes', 'no' (because merge sorts rows). Third argument is detect and drop additional duplicated columns: 'yes', 'no'.")
     parser.add_argument('--mrgdups', type=int, nargs='+',
-    							help="Combine gappy duplicate columns into a single column with all the values.\
-    							Columns are specified by their 0-based positional index given as arguments here.")
+    							help="Combine gappy duplicate columns into a single column with all the values. Columns are specified by their 0-based positional index given as arguments here.")
     parser.add_argument('--valset', nargs=3,
-                                help="Get the non-redundant set of values in the given row/column. \
-                                Takes three arguments: (i) orientation 'r' for row or 'c' for column, \
-                                (ii) position index of the row/column, (iii) repetition filter: \
-                                'a' all values, 'u' unique values only, 'r' only values with two or more instances.")
+                                help="Get the non-redundant set of values in the given row/column. Takes three arguments: (i) orientation 'r' for row or 'c' for column, (ii) position index of the row/column, (iii) repetition filter: 'a' all values, 'u' unique values only, 'r' only values with two or more instances.")
     params = parser.parse_args(args)
 
     # INPUT ###################################################################
@@ -1361,7 +1326,7 @@ def main(args):
                     flist.append(fields[0])
     elif params.INPUTTYPE == 'L':
         # Create the FilesList, by appending the contents of all provided lists.
-        flist = FilesList().populate_from_files(targets, verbatim=params.verbatim)
+        flist = FilesList().populate_from_files(targets, verbatim=params.verbatim, alias_verbatim=params.verbatim)
     elif params.INPUTTYPE == 'T':
         # Create the FilesList by supplying a direct list of files.
         flist = FilesList(targets, verbatim=params.verbatim)
@@ -1371,6 +1336,10 @@ def main(args):
         flist = FilesList(verbatim=params.verbatim)
     else:
         sys.exit(ml.errstring("Unknown INPUTTYPE."))
+
+    if params.index:
+        if len(params.idxCol) != 1 and len(params.idxCol) != len(flist):
+            sys.exit(ml.errstring("Invalid number of index columns."))
 
     if params.expand_ranges:
         # Generate the range.
@@ -1398,40 +1367,27 @@ def main(args):
 
     # CALL DETAILS ############################################################
 
-    if params.log:
-        ml.log_command()
-#    if params.STDERRcomments:
-#        sys.stderr.write(ml.paramstring())
+    if params.STDERRcomments:
+        sys.stderr.write(ml.paramstring())
 
     # TASKS ###################################################################
 
     # Filter DIRECTORY contents. ----------------------------------------------
     if params.dir is not None:
         result = FilesList().populate_from_directories(flist, params.dir)
-        try:
-            if params.comments:
-                sys.stdout.write(ml.paramstring())
-            sys.stdout.write(result.to_file())
-            if params.STDERRcomments:
-                sys.stderr.write(ml.donestring("listing"))
-        except IOError:
-            pass
+        sys.stdout.write(result.to_file())
+        if params.STDERRcomments:
+            sys.stderr.write(ml.donestring("listing"))
 
-
-    # LOOP arbitrary command. -------------------------------------------------
+    # LOOP a command. -------------------------------------------------
     elif params.loop:
         command = []
         for c in params.loop:
             command.append(c.lstrip("+"))
-        try:
-            do_foreach(flist, command, out=(outdir, outpref, outsuff),
-                       progress=(params.STDERRcomments), comments=params.comments,
-                       log=params.log)
-            if params.STDERRcomments:
-                sys.stderr.write(ml.donestring("looping"))
-        except IOError:
-            pass
-
+        do_foreach(flist, command, out=(outdir, outpref, outsuff),
+                   progress=(params.STDERRcomments), log=params.log)
+        if params.STDERRcomments:
+            sys.stderr.write(ml.donestring("looping"))
 
     # Symbolic LINKS. ---------------------------------------------------------
     elif params.link:
@@ -1441,7 +1397,7 @@ def main(args):
 
 
     # CONCATENATE strings. --------------------------------------------------------
-    if params.concat:
+    elif params.concat:
         sys.stdout.write(params.concat.join(flist))
         if params.STDERRcomments:
             sys.stderr.write(ml.donestring("concatenating values"))
@@ -1461,22 +1417,12 @@ def main(args):
             if outfiles:
                 # Send to individual file instead of STDOUT.
                 outstream = open(outfiles[i], 'w')
-            try:
-                if params.comments:
-                    # Embed call info at beginning of output. More useful there when outputting to files.
-                    outstream.write(ml.paramstring("SOURCE: " + myfile))
-                outstream.write(result[i].rstrip("\n") +"\n")
-            except IOError:
-                pass
-            finally:
-                if outfiles:
-                    # Don't want to accidentally close STDOUT.
-                    outstream.close()
+            outstream.write(result[i].rstrip("\n") +"\n")
+            if outfiles:
+                # Don't want to accidentally close STDOUT.
+                outstream.close()
         if params.STDERRcomments:
-            try:
-                sys.stderr.write(ml.donestring("swapping delimiters"))
-            except IOError:
-                pass
+            sys.stderr.write(ml.donestring("swapping delimiters"))
 
 
     # Get COLUMNS or RANDOM columns. (most code shared) -----------------------
@@ -1488,9 +1434,7 @@ def main(args):
         # Determine if using index, and assign appropriate value.
         idx = None
         if params.index:
-            idx = 0
-        else:
-            idx = None
+            idx = params.idxCol
         # Extract data.
         result = None
         if params.cols:
@@ -1508,66 +1452,45 @@ def main(args):
         if flist == []:
             flist.append("<STDIN>")
         if merge:
-            try:
-                if params.comments:
-                    # Embed call info at beginning of output.
-                    outstream.write(ml.paramstring("SOURCE: " + myfile))
-                if params.metadata:
-                    # Dump all the metadata from all the merged input sources.
-                    for i, (myfile, myalias) in flist.enum():
-                        outstream.write(metadata[myfile])
-                outstream.write( result[0].to_csv(header=params.relabel, index=params.index, sep=params.sep[0]))
-            except IOError:
-                pass
+            if params.metadata:
+                # Dump all the metadata from all the merged input sources.
+                for i, (myfile, myalias) in flist.enum():
+                    outstream.write(metadata[myfile])
+            outstream.write( result[0].to_csv(header=params.relabel, index=params.index, sep=params.sep[0]))
         else:
             for i, (myfile, myalias) in flist.enum():
                 outstream = open(outfiles[i], 'w')
-                try:
-                    if params.comments:
-                        # Embed call info at beginning of output.
-                        outstream.write(ml.paramstring("SOURCE: " + myfile))
-                    if params.metadata:
-                        outstream.write(metadata[myfile])
-                    outstream.write( result[i].to_csv(header=params.relabel, index=params.index, sep=params.sep[0]))
-                except IOError:
-                    pass
-                finally:
-                    outstream.close()
+                if params.metadata:
+                    outstream.write(metadata[myfile])
+                outstream.write( result[i].to_csv(header=params.relabel, index=params.index, sep=params.sep[0]))
+                outstream.close()
         if params.STDERRcomments:
-            try:
-                if params.cols:
-                    sys.stderr.write(ml.donestring("getting columns, index "+ str(idx is not None)))
-                else:
-                    sys.stderr.write(ml.donestring("getting random columns, index "+ str(idx is not None)))
-            except IOError:
-                pass
+            if params.cols:
+                sys.stderr.write(ml.donestring("getting columns, index "+ str(idx is not None)))
+            else:
+                sys.stderr.write(ml.donestring("getting random columns, index "+ str(idx is not None)))
 
 
     # APPEND columns or MERGE table. ---------------------------------------------------------
     elif params.appnd or params.merge:
         idx = None
+        if params.index:
+            idx = params.idxCol
         if params.appnd:
-            if params.index:
-                idx = 0
-            df = append_columns(flist, colSep=params.sep, header=params.labels, index=idx, type=params.appnd)
+            df = append_columns(flist, colSep=params.sep, header=params.labels, index=idx, type="outer")
         else:
-            df = merge_tables(flist, colSep=params.sep, header=params.labels, index=0, type=params.merge[0],
-                              saveHeader=params.merge[1] == "yes", dedup=params.merge[2] == "yes")
-        try:
-            if params.comments:
-                ml.parastring()
-            if params.metadata:
-                # Dump all the metadata from all the merged input sources.
-                for i, (myfile, myalias) in flist.enum():
-                    outstream.write(metadata[myfile])
-            sys.stdout.write(df.to_csv(sep=params.sep[0], header=params.relabel, index=params.index))
-            if params.STDERRcomments:
-                if params.appnd:
-                    sys.stderr.write(ml.donestring(params.appnd +" append of columns, index "+ str(idx is not None)))
-                else:
-                    sys.stderr.write(ml.donestring(params.merge[0] +" merge of tables"))
-        except IOError:
-            pass
+            df = merge_tables(flist, colSep=params.sep, header=params.labels, index=idx, type=params.merge[0],
+                              saveHeader=(params.merge[1]=="yes"), dedup=(params.merge[2]=="yes"))
+        if params.metadata:
+            # Dump all the metadata from all the merged input sources.
+            for i, (myfile, myalias) in flist.enum():
+                outstream.write(metadata[myfile])
+        sys.stdout.write(df.to_csv(sep=params.sep[0], header=params.relabel, index=(params.index or params.merge)))
+        if params.STDERRcomments:
+            if params.appnd:
+                sys.stderr.write(ml.donestring("appending columns, index "+ str(idx is not None)))
+            else:
+                sys.stderr.write(ml.donestring(params.merge[0] +" merge of tables"))
 
 
     # MERGE duplicate columns. ---------------------------------------------------------
@@ -1582,70 +1505,43 @@ def main(args):
         if flist == []:
             flist.append("<STDIN>")
         if merge:
-            try:
-                if params.comments:
-                    # Embed call info at beginning of output.
-                    outstream.write(ml.paramstring("SOURCE: " + myfile))
-                if params.metadata:
-                    # Dump all the metadata from all the merged input sources.
-                    for i, (myfile, myalias) in flist.enum():
-                        outstream.write(metadata[myfile])
-                outstream.write( result[0].to_csv(header=params.relabel, index=params.index, sep=params.sep[0]))
-            except IOError:
-                pass
+            if params.metadata:
+                # Dump all the metadata from all the merged input sources.
+                for i, (myfile, myalias) in flist.enum():
+                    outstream.write(metadata[myfile])
+            outstream.write( result[0].to_csv(header=params.relabel, index=params.index, sep=params.sep[0]))
         else:
             for i, (myfile, myalias) in flist.enum():
                 outstream = open(outfiles[i], 'w')
-                try:
-                    if params.comments:
-                        # Embed call info at beginning of output.
-                        outstream.write(ml.paramstring("SOURCE: " + myfile))
-                    if params.metadata:
-                        outstream.write(metadata[myfile])
-                    outstream.write( result[i].to_csv(header=params.relabel, index=params.index, sep=params.sep[0]))
-                except IOError:
-                    pass
-                finally:
-                    outstream.close()
+                if params.metadata:
+                    outstream.write(metadata[myfile])
+                outstream.write( result[i].to_csv(header=params.relabel, index=params.index, sep=params.sep[0]))
+                outstream.close()
         if params.STDERRcomments:
-            try:
-                sys.stderr.write(ml.donestring("deduplicating columns"))
-            except IOError:
-                pass
+            sys.stderr.write(ml.donestring("deduplicating columns"))
 
 
     # COUNT columns. ----------------------------------------------------------
     elif params.cntcols:
         result = count_columns(flist, params.sep)
-        try:
-            if params.comments:
-                sys.stdout.write(ml.paramstring())
-            for f, (myfile, myalias) in flist.enum():
-                print("\t".join([str(result[f]), myalias, myfile]))
-            if params.STDERRcomments:
-                sys.stderr.write(ml.donestring("counting columns"))
-        except IOError:
-            pass
+        for f, (myfile, myalias) in flist.enum():
+            print("\t".join([str(result[f]), myalias, myfile]))
+        if params.STDERRcomments:
+            sys.stderr.write(ml.donestring("counting columns"))
 
 
     # SET of values in row/column. --------------------------------------------
     elif params.valset:
         nest = get_valuesSet(flist, axis=params.valset[0], index=params.valset[1], filter=params.valset[2], colSep=params.sep)
-        try:
-            if params.comments:
-                sys.stdout.write(ml.paramstring())
-            for f, (myfile, myalias) in flist.enum():
-                print("".join([myfile, "\t", str(nest[f])]))
-            if params.STDERRcomments:
-                sys.stderr.write(ml.donestring("obtaining set of values."))
-        except IOError:
-            pass
+        for f, (myfile, myalias) in flist.enum():
+            print("".join([myfile, "\t", str(nest[f])]))
+        if params.STDERRcomments:
+            sys.stderr.write(ml.donestring("obtaining set of values."))
 
 
-
-#     # All done.
-#     if params.STDERRcomments:
-#         sys.stderr.write(ml.donestring())
+    # All done.
+#    if params.STDERRcomments:
+#        sys.stderr.write(ml.donestring())
 
 
 
