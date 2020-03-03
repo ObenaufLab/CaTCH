@@ -1,157 +1,61 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Date located in: -
-from __future__ import print_function
+# from __future__ import print_function
 import sys, os, re
-
-import subprocess
-
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
-from os.path import basename
+from Levenshtein import hamming
 
-from Bio import SeqIO
-from Bio.Seq import Seq
-from string import upper
-import Levenshtein
+# It would be cleaner to apply the distance limit directly while quantifying the barcodes.
+# But that would explode the number of comparisons done, in exchange for having some fewer barcodes in the dictionary.
+# Letting the quantifier count all barcodes at identity level and then filter the counted barcodes here in a separate set might be more efficient than measuring the distance for every read.
 
 usage = "Hamming distance merge"
 parser = ArgumentParser(description=usage, formatter_class=RawDescriptionHelpFormatter)
-parser.add_argument("-b", "--barcodes", type=str, required=True, dest="barcodesFile", help="Tab delimited barcode counts file")
+parser.add_argument("-b", "--barcodes", type=str, required=True, dest="barcodesFile", help="Tab delimited file: barcode_sequence \\t count")
+parser.add_argument("-d", "--hammDist", type=int, default=1, help="Hamming distance at which barcodes should be considered the same (1)")
+parser.add_argument("-o", "--outfile", type=str, required=True, help="Output file.")
 
 args = parser.parse_args()
 
 ##############
-# Read bc
+# Read bc and merge
 ##############
 
+# Doing it as barcodes are parsed, reduces the size of the dictionary.
 bc = dict()
-
-with(open(args.barcodesFile, 'r')) as f:
+first = True
+with open(args.barcodesFile, 'r') as f:
     for line in f:
         barcode, count = line.rstrip().split("\t")
-        if int(count) > 1:
-            bc[barcode] = int(count)
-
-merge = True
-
-print("Starting neighbor joining done.",file=sys.stderr)
-restartCounter = 0
-
-while merge:
-    merge = False
-    index = 0
-    barcodes = bc.keys()
-    barcodes.sort()
-    while index < (len(barcodes) - 1):
-        base = barcodes[index]
-        test = barcodes[index + 1]
-
-        if len(base) == len(test) :
-
-            if Levenshtein.hamming(base, test) == 1:
-                baseAb = bc[base]
-                testAb = bc[test]
-
-                if baseAb > testAb:
-                    if testAb >= float(baseAb) / 8:
-                        bc[base] += bc[test]
-                        del bc[test]
-                        merge = True
-                else:
-                    if baseAb >= float(testAb) / 8:
-                        bc[test] += bc[base]
-                        del bc[base]
-                        merge = True
-
-            if Levenshtein.hamming(base, test) == 2:
-                baseAb = bc[base]
-                testAb = bc[test]
-
-                if baseAb > testAb:
-                    if testAb >= float(baseAb) / 40:
-                        bc[base] += bc[test]
-                        del bc[test]
-                        merge = True
-                else:
-                    if baseAb >= float(testAb) / 40:
-                        bc[test] += bc[base]
-                        del bc[base]
-                        merge = True
-
-        if merge:
-            print("Merged. Restart " + str(restartCounter) + ".",file=sys.stderr)
-            restartCounter += 1
-            break
-
-        index += 1
-
-print("Lexicographical neighbor joining done.", file=sys.stderr)
-print("Starting computationally intense n2 hamming search.",file=sys.stderr)
-
-restartCounter = 0
-
-merge = True
-
-while merge:
-    merge = False
-    cur = 1
-    prev = 0
-    barcodes = bc.keys()
-    barcodes.sort()
-    while prev < (len(barcodes) - 1):
-        while cur < len(barcodes):
-            base = barcodes[prev]
-            test = barcodes[cur]
-
-            if len(base) == len(test) :
-
-                if Levenshtein.hamming(base, test) == 1:
-                    baseAb = bc[base]
-                    testAb = bc[test]
-
-                    if baseAb > testAb:
-                        if testAb >= float(baseAb) / 8:
-                            bc[base] += bc[test]
-                            del bc[test]
-                            merge = True
+        count = int(count)
+        if first:
+            bc[barcode] = count
+            first = False
+        else:
+            found = False
+            for b in list(bc):
+                if len(b) == len(barcode) and hamming(b, barcode) <= args.hammDist:
+                    if bc[b] >= count:
+                        # If existing sequence is more abundant, update its count and discard the new sequence
+                        # This is the most likely scenario, as the quantifier orders the barcodes by decreasing abundance.
+                        bc[b] = bc[b] + count
+                        found = True
+                        break
                     else:
-                        if baseAb >= float(testAb) / 8:
-                            bc[test] += bc[base]
-                            del bc[base]
-                            merge = True
+                        # Add the new sequence with combined count, and remove the old sequence
+                        bc[barcode] = count + bc[b]
+                        bc.pop(b)
+                        found = True
+                        break
+            if not found:
+                bc[barcode] = count
 
-                if Levenshtein.hamming(base, test) == 2:
-                    baseAb = bc[base]
-                    testAb = bc[test]
+##############
+# Output
+##############
 
-                    if baseAb > testAb:
-                        if testAb >= float(baseAb) / 40:
-                            bc[base] += bc[test]
-                            del bc[test]
-                            merge = True
-                    else:
-                        if baseAb >= float(testAb) / 40:
-                            bc[test] += bc[base]
-                            del bc[base]
-                            merge = True
-
-            if merge:
-                print("Merged. Restart " + str(restartCounter) + ".",file=sys.stderr)
-                restartCounter += 1
-                break
-
-            cur += 1
-
-        if merge:
-            break
-
-        prev += 1
-
-print("Computationally intense n2 hamming search done.",file=sys.stderr)
-
-barcodes = bc.keys()
-barcodes.sort()
-
-for barcode in barcodes:
-    print(barcode + "\t" + str(bc[barcode]))
+with open(args.outfile, 'w') as f:
+    for barcode in bc:
+        f.write(barcode + "\t" + str(bc[barcode]) + "\n")
