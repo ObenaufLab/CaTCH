@@ -58,6 +58,18 @@ treatCols <- c(ref="forestgreen", UT="dodgerblue", DT="mediumorchid1", bc="orang
 getPalette <- colorRampPalette(brewer.pal(8, "Accent"))
 ```
 
+Set sample order.
+
+```{r order}
+# Tidy up sample names.
+sampleNames <- c("day0",  
+                 "L277_notreat",	"R277_notreat", "R279_notreat", "R282_notreat", "R288_notreat",
+                 "L286_treat", "L287_treat", "R281_treat", "R286_treat", "R287_treat")
+
+samples_tidy <- data.frame(name=factor(sampleNames, levels=sampleNames, ordered=TRUE), 
+                           treatment=c(rep('ref', 1), rep('UT', 5), rep('DT', 5)))
+```
+
 Load data.
 
 ```{r data}
@@ -70,6 +82,9 @@ statsout = '/Volumes/groups/obenauf/Kimon_Froussios/chris/CE83TANXX_review/analy
 counts[is.na(counts)] <- 0
 summaries[is.na(summaries)] <- 0
 
+# Reorder/select counts columns.
+counts <- counts[, c('barcode', sampleNames), with=FALSE]
+
 # Get rid of barcodes not seen in the samples.
 counts <- counts[rowSums(counts[, 2:length(counts)]) != 0, ]
 
@@ -77,7 +92,7 @@ counts <- counts[rowSums(counts[, 2:length(counts)]) != 0, ]
 counts[, bc_id := order(day0, decreasing=TRUE)]
 setkey(counts, bc_id)
 
-# counts columns with counts
+# Vector of counts columns.
 cntCols <- 2:(length(counts)-1)
 ```
 
@@ -86,18 +101,6 @@ Thresholds
 ```{r thresholds}
 count_thresh = 50
 abund_thresh <- 0.02
-```
-
-Set sample order.
-
-```{r order}
-# Tidy up sample names.
-sampleNames <- c("day0",  
-                 "L277_notreat",	"R277_notreat", "R279_notreat", "R282_notreat", "R288_notreat",
-                 "L286_treat", "L287_treat", "R281_treat", "R286_treat", "R287_treat")
-
-samples_tidy <- data.frame(name=factor(sampleNames, levels=sampleNames, ordered=TRUE), 
-                           treatment=c(rep('ref', 1), rep('UT', 5), rep('DT', 5)))
 ```
 
 Calculate proportions and tidy up the data format.
