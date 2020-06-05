@@ -22,8 +22,9 @@ parser.add_argument('-r', "--revcomp", action='store_true', help="Reverse comple
 parser.add_argument('-i', "--spikein", action='store_true', help="Barcode was spiked-in (default: false)")
 parser.add_argument('-s', "--stringent", action='store_true', help="Stringent barcode matching (default: false)")
 parser.add_argument('-o', "--outdir", type=str, required=False, default="./process", help="Output directory for counts (./process/)")
-parser.add_argument('--bc_len', type=int, default=67, help="Length of the barcode from start position of the match (67).")
+parser.add_argument('--bc_len', type=int, default=67, help="Length of the barcode (67).")
 parser.add_argument('--gt_len', type=int, default=20, help="Genotyping tag length (20).")
+parser.add_argument('--n_dark', type=int, default=0, help="Number of dark bases to consifer in the barcode pattern (0).")
 
 args = parser.parse_args()
 
@@ -52,24 +53,31 @@ else:
 # Barcode designs
 ##############
 
-    # GBNSNNNVDNVNVWVMWNNRCGGCGBNSNNNNDNGGCWVMWNNRCGGCGBNSNNNVDNVNVWVMWNNR      <- sequencing direction
-    # RNNWMVWVNVNDVNNNSNB CGCCG RNNWMVW GCC NDNNNNSNB CGCCG
+    #    20nt                |short end       short start|               19nt
+    # <--GBNSNNNVDNVNVWVMWNNRCGGCGBNSNNNNDNGGCWVMWNNRCGGCGBNSNNNVDNVNVWVMWNNR--<      <- sequencing direction <-
+    #
+    # >--RNNWMVWVNVNDVNNNSNBCGCCGRNNWMVWGCCNDNNNNSNBCGCCGRNNWMVWVNVNDVNNNSNBG-->      strict pattern
+    #    19nt               CGCCGRNNWMVWGCCNDNNNNSNBCGCCG                20nt         short pattern and offsets
+
 # Christian's design:
-    # P7adapter_template_BARCODE_GenotypeTag_SampleINDEX_NNNNNN_P5adapter       <--- read direction, unlikely to get past the template.
+    # P7adapter_template_BARCODE_GenotypeTag_SampleINDEX_NNNNNN_P5adapter       <--- read direction, unlikely to get past the template. Sample Index is contained in the read and can be used by this script.
 # Shona's design:
-    # P7adapter_SampleIndex_template_BARCODE_GenotypeTag_P5adapter              <--- read direction, unlikely to contain the SampleIndex, demultiplexed externally by mate pair.
+    # P7adapter_SampleIndex_template_BARCODE_GenotypeTag_P5adapter              <--- read direction, unlikely to contain the SampleIndex, reads already demultiplexed by sequencing facility using mate pair.
 
 # Barcode pattern
 bc_pattern_full = re.compile('[TC]{1}[ATGC]{2}[AT]{1}[TG]{1}[TGC]{1}[AT]{1}[TGC]{1}[ATGC]{1}[TGC]{1}[ATGC]{1}[ATC]{1}[TGC]{1}[ATGC]{3}[CG]{1}[ATGC]{1}[CGA]{1}CGCCG[TC]{1}[AGTC]{2}[AT]{1}[TG]{1}[TCG]{1}[AT]{1}GCC[ATGC]{1}[ACT]{1}[ATGC]{4}[GC]{1}[AGTC]{1}[CGA]{1}CGCCG')
 bc_pattern_short = re.compile('CGCCG[ATGC]{7}GCC[ATGC]{9}CGCCG')
+bc_pattern_dark = re.compile('[CN][GN][CN][CN][GN][ATGCN]{7}[GN][CN][CN][ATGCN]{9}[CN][GN][CN][CN][G]')  # allow dark bases, based on the short pattern.
+                                                                                                         # should be ok for high quality sequencing with very few Ns.
+                                                                                                         # would be problematic if many Ns are present.
 bc_pattern = None
 offset = None
 if args.stringent:
     bc_pattern = bc_pattern_full
-    offset = 0
+    offset = 0      # Pattern matches the whole length of the barcode.
 else:
     bc_pattern = bc_pattern_short
-    offset = 19    # Compensate for the short pattern not being at the beginning of the strict pattern.
+    offset = 19    # Compensate for the short pattern starting 20nt internally to the barcode.
 # Empty vector pattern
 empty_pattern = re.compile('AGAGACGGATATCACTAGTCGTCTCCGTTCGCTCTAGACAGGGTACCCAGCATATGATAGGGTCCCCT')
 # Spike-in barcode
@@ -88,8 +96,10 @@ bcStats = Counter()  # Counter of total matches per sample.
 library = dict()                    # dictionary of counters. One barcode counter per sample.
 for sample in bc.values():
     library[sample] = Counter()
-bc["unknown"] = "sample-unknown"       # unrecognized sample tags
-bc["unmatched"] = "bc-unmatched"       # barcode pattern didn't match
+bc["unknown"] = "SampleUnknown"       # unrecognized sample tags
+bc["unmatched"] = "BCUnmatched"       # barcode pattern didn't match
+bc["empty"] = "EmptyVector"           # Diagnostic 1
+bc["spike"] = "SpikeIn"               # Diagnostic 2
 
 ##############
 # Count the barcodes
@@ -97,14 +107,20 @@ bc["unmatched"] = "bc-unmatched"       # barcode pattern didn't match
 
 # Reduce repetitive code
 # This function directly updates the counters in the global scope.
-def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra=offset):
-    myread = record.query_sequence
+# Reads that don't match the pattern return False, 
+# reads that match the pattern but do not match the demultiplication codes go to fout and return True,
+# reads that match the pattern and a demux code go to the library dict and return True.
+# The diagnostic parameter is used to redirect reads that match special patterns, so they don't confuse things in the library.
+def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra = 0, diagnostic = None, dark = 0):
+    myread = record.query_sequence.upper()
     match = mypattern.search(myread)
     if match:
-        start = match.start(0) - extra
-        barcode = myread[start:(start + bcl)]          # The pattern is part of the barcode.
+        start = match.start(0) - extra               # The pattern is internal to the barcode.
+        barcode = myread[start:(start + bcl)]        
+        if barcode.count('N') > dark:
+            return False
+        
         genotyping = myread[(start - gtl):start]     # The genotyping tag is immediately before the barcode.
-
         if sampleTagLens:
             found = False       # flag to report whether any of the tag lengths resulted in a match
             sampleTag=None
@@ -113,14 +129,17 @@ def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args
                 if sampleTag in bc:
                     found = True
                     bcStats.update([bc[sampleTag]])             # total hits for the sample
-                    library[bc[sampleTag]].update([barcode])    # hits of the barode in the sample
+                    if not diagnostic:
+                        library[bc[sampleTag]].update([barcode])    # hits of the barode in the sample
+                    else:
+                        library[bc[sampleTag]].update([diagnostic]) # hits of the diagnostic pattern in the sample
                     break
-            if not found:
+            if not found and not diagnostic:
+                fout.write(record)
                 bcStats.update([bc["unknown"]])
                 ##library[bc["unknown"]].update([barcode])
-                fout.write(record)
-        else:
-            bcStats.update([bc["demuxed"]])
+        elif not diagnostic:
+            bcStats.update([bc["demuxed"]])           # Dummy sample to maintain the code and output format
             library[bc["demuxed"]].update([barcode])
         return True
     else:
@@ -132,19 +151,24 @@ if not os.path.exists(os.path.join(args.outdir, prefix)):
 with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Checking for reference sequences in the header has to be disabled for unaligned BAM.
     with pysam.AlignmentFile(os.path.join(args.outdir, prefix, prefix + "_unmatched.bam"), 'wb', template=fin) as unmatched_bc:
         with pysam.AlignmentFile(os.path.join(args.outdir, prefix, prefix + "_unknown.bam"), 'wb', template=fin) as unknown_sample:
-            # Scan the reads
-            for record in fin:
-                if recognize(bc_pattern, record, unknown_sample):
-                    pass  # Counters are updated by the function directly, there is no additional logic to implement.
-                elif recognize(empty_pattern, record, unknown_sample) :
-                    pass  # as above
-                elif args.spikein and recognize(spike_pattern, record, unknown_sample):
-                    pass  # as above
-                else :
-                    # None of the patterns has matched
-                    bcStats.update([bc["unmatched"]])
-                    ##library[bc["unmatched"]].update([barcode])
-                    unmatched_bc.write(record)
+            with pysam.AlignmentFile(os.path.join(args.outdir, prefix, prefix + "_diagnostic.bam"), 'wb', template=fin) as diagnostic_pattern:
+                # Scan the reads
+                for record in fin:
+                    if recognize(bc_pattern, record, unknown_sample, extra=offset):
+                        pass  # Counters and barcode library are updated by the function directly, there is no additional logic to implement.
+                    if recognize(bc_pattern_dark, record, unknown_sample, extra=offset, dark=args.n_dark):
+                        pass  # Counters and barcode library are updated by the function directly, there is no additional logic to implement.
+                    elif recognize(empty_pattern, record, unknown_sample, diagnostic='empty') :
+                        bcStats.update([bc['empty']])    # if demultiplexing, sample-specific diagnostic counts will be handled by recognize()
+                        diagnostic_pattern.write(record)
+                    elif args.spikein and recognize(spike_pattern, record, unknown_sample, diagnostic='spike'):
+                        bcStats.update([bc['spike']])    # if demultiplexing, sample-specific diagnostic counts will be handled by recognize()
+                        diagnostic_pattern.write(record)
+                    else :
+                        # None of the patterns has matched
+                        bcStats.update([bc["unmatched"]])
+                        ##library[bc["unmatched"]].update([barcode])
+                        unmatched_bc.write(record)
 
 ##############
 # Output the barcode counts for each sample
@@ -160,7 +184,19 @@ for sample in samples:
 # Demultiplexing report
 ##############
 
-samples = sorted(bcStats.keys())
+def natural_sorted(l):
+    """Sort list of numbers/strings in human-friendly order.
+
+    Args:
+        l(list): A list of strings.
+    Returns:
+        list
+    """
+    convert = lambda text: int(text) if text.isdigit() else text.lower()
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
+    return sorted(l, key = alphanum_key)
+
+samples = natural_sorted(bcStats.keys())
 with open(os.path.join(args.outdir, prefix, prefix + "_summary.txt"), "w") as fout:
     for sample in samples:
         fout.write(sample + "\t" + str(bcStats[sample]) + "\n")

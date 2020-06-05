@@ -3,27 +3,28 @@
 library(data.table)
 
 args <- commandArgs(trailingOnly = TRUE)
-# args <- c('/Volumes/groups/obenauf/Kimon_Froussios/chris/CE83TANXX_review/process/CE83TANXX_7_20200221B_20200224', 'test.txt.')
+# args <- c('/Volumes/groups/obenauf/Kimon_Froussios/chris/CE83TANXX_review/process/CE83TANXX_7_20200221B_20200224', 'test.txt', '_barcode-counts.txt')
 
-files <- dir(args[1], pattern='barcode-counts.txt', full.names=TRUE)
+patt <-  args[3]
+files <- dir(args[1], pattern=patt, full.names=TRUE)
 out <- args[2]
-
 
 # f <- files[1]
 tables <- lapply(files, function(f) {
 	DT <- fread(f)
-	names(DT) <- c('barcode', sub('_barcode-counts.txt', '', basename(f)))
+	names(DT) <- c(ifelse(grepl('barcode', patt), 'barcode', 'sample'), sub(patt, '', basename(f)))
 	DT
 })
 
-counts <- Reduce(function(df1, df2) merge(df1, df2, by='barcode', all=TRUE), tables)
+id <- names(tables[[1]])[1]
+counts <- Reduce(function(df1, df2) merge(df1, df2, by=id, all=TRUE), tables)
 counts[is.na(counts)] <- 0
 
 # On-screen report of library sizes
-print( colSums(counts[, names(counts) != 'barcode', with=FALSE]) )
+print( colSums(counts[, names(counts) != id, with=FALSE]) )
 
 # On-screen report of barcode counts
-vapply(counts[, names(counts) != 'barcode', with=FALSE], 
+vapply(counts[, names(counts) != id, with=FALSE], 
 			 function(x) { sum(x>0) }, 
 			 integer(1) )
 
