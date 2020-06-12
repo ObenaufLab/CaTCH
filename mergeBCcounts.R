@@ -21,9 +21,11 @@ counts <- Reduce(function(df1, df2) merge(df1, df2, by=id, all=TRUE), tables)
 counts[is.na(counts)] <- 0
 
 # On-screen report of library sizes
+print("Read Counts")
 print( colSums(counts[, names(counts) != id, with=FALSE]) )
 
 # On-screen report of barcode counts
+print("Barcode Counts")
 vapply(counts[, names(counts) != id, with=FALSE], 
 			 function(x) { sum(x>0) }, 
 			 integer(1) )

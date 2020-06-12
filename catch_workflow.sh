@@ -16,7 +16,7 @@ function usage() {
 }
 
 # Defaults
-SCRIPTSPATH='/users/kimon.froussios/catch/scripts'
+SCRIPTSPATH='/users/kimon.froussios/catch'
 #FU='/users/kimon.froussios/utility_scripts'
 PYTHONPATH="$PYTHONPATH:$SCRIPTSPATH"
 hamm=0

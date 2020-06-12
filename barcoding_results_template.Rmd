@@ -87,9 +87,10 @@ treatCols <- c(treatCols, bc='white')
 
 # If summaries only has one column of values (ie. one BAM file, or already in long format)
 if (length(summaries) == 2) {
-    names(summaries) <- c('row_ID', 'lane')
+    names(summaries) <- c('row_ID', 'file')
 } else {
   names(summaries)[1] <- 'row_ID' # need a stable name I can reference
+  summaries <- melt(summaries, id.vars = "row_ID", variable.name = "file", value.name = "reads")
 }
 
 # Plug any gaps from undetected barcodes.
@@ -98,7 +99,9 @@ summaries[is.na(summaries)] <- 0
 
 # Reorder/select samples.
 counts <- counts[, c('barcode', sampleNames), with=FALSE]
-summaries <- summaries[, c("row_ID", sampleNames), with=FALSE][row_ID %in% c("BCUnmatched", "EmptyVector", "SampleUnknown", "SpikeIn", sampleNames)]
+if (length(summaries) > 2) {
+  summaries <- summaries[row_ID %in% c("BCUnmatched", "EmptyVector", "SampleUnknown", "SpikeIn", sampleNames)]
+}
 if (!is.null(params$hammdist)) {
   hammdist <- hammdist[Sample %in% sampleNames, ]
   hammdist[, Sample := ordered(Sample, levels=sampleNames)]

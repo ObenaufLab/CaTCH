@@ -17,7 +17,7 @@ spec = matrix(c(
 ), byrow=TRUE, ncol=5)
 
 opt = getopt(spec)
-# opt <- list(countsFile='/users/kimon.froussios/obenauf/shona/catch_R9475/process/raw/raw_barcodes.txt', summariesFile='/users/kimon.froussios/obenauf/shona/catch_R9475/process/raw/summaries.txt', samples='/users/kimon.froussios/obenauf/shona/catch_R9475/description/covars.txt', resultsDir='/users/kimon.froussios/obenauf/shona/catch_R9475/results/raw/', refsamps='1', count_thresh=50, abund_thresh=0.01)
+# opt <- list(countsFile='/users/kimon.froussios/obenauf/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_barcode-counts.tsv', summariesFile='/users/kimon.froussios/obenauf/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_summary.tsv', samples='/users/kimon.froussios/obenauf/shona/catch_R9739/description/covars.txt', resultsDir='/users/kimon.froussios/obenauf/shona/catch_R9739/results/', refsamps='1', count_thresh=50, abund_thresh=0.01)
 
 if ( !is.null(opt$help) ) {
   cat(getopt(spec, usage=TRUE))
