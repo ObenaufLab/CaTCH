@@ -5,8 +5,10 @@ date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
   html_document:
     code_folding: hide
-    toc: yes
-    toc_float: no
+    toc: true
+    toc_float:
+      toc_collapsed: false
+      smooth_scroll: false
 params:
   counts: './null'       # provide valid counts file with all the samples.
   summaries: './null'    # provide valid DEseq2-style covariates table file with sample, condition, colour. Can be used to subset the samples included in counts.
@@ -17,6 +19,7 @@ params:
   refsamps: 1            # Which samples to use as reference abundances for naming the barcodes.
   count_thresh: 50       # Barcodes with counts below this will be discarded.
   abund_thresh: 0.01     # Barcodes exceeding this proportional representation are considered top hits.
+  extra_bc: '`r NULL`'
 editor_options: 
   chunk_output_type: console
 ---
@@ -42,7 +45,7 @@ library(RColorBrewer)
 library(pheatmap)
 library(patchwork)
 
-# params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$samples, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), topdf = opt$topdf, refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh )
+# params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$samples, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), topdf = opt$topdf, refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc )
 
 # ggplot2 theme.
 gth <- theme(axis.line.x= element_line(),
@@ -423,13 +426,45 @@ if (topdf){
 }
 ```
 
-# Enrichment of top shared barcodes
+# Enrichment of barcodes
 
-## Distribution
+## Expression heatmap of top barcodes.
+
+All barcodes above the proportion threshold.
+
+```{r enrichment, fig.height=15}
+top <- all_tidy %>% 
+  filter(prop_Top) %>%
+  select(bc_id) %>%
+  arrange(bc_id) %>%
+  unique()
+
+p1 <- all_tidy %>%
+  arrange(bc_id) %>%
+  filter(bc_id %in% top$bc_id) %>%
+  select(Sample, bc_id, Proportion) %>%
+  mutate(bc_id=factor(as.character(bc_id), levels=as.character(top$bc_id))) %>%
+  ggplot(aes(x=Sample, y=bc_id, fill=Proportion)) +
+    geom_tile(colour='transparent') +
+    # scale_fill_gradient(low="transparent", high="midnightblue") +
+    labs(x='') +
+    theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+          legend.position = "right",
+          panel.background = element_rect(fill="white"),
+          panel.grid.major = element_line(colour="grey95"))
+
+if (topdf){
+  print ( p1 )
+} else {
+  ggplotly( p1, dynamicTicks = TRUE )
+}
+```
+
+## Distribution of top shared barcodes
 
 Mind that the Y-axis scale is **logarithmic**. Outliers at the top are much farther away from the main bulk of the distribution than they appear.
 
-```{r enrichment}
+```{r enrichment_shared}
 for (bc in sharedBarcodes$bc_id) {
   # bc <- sharedBarcodes$bc_id[1]
   
@@ -480,35 +515,62 @@ for (bc in sharedBarcodes$bc_id) {
 }
 ```
 
-## Matrix
+## Distribution of manually selected barcodes
 
-All top-proportion barcodes.
+Mind that the Y-axis scale is **logarithmic**. Outliers at the top are much farther away from the main bulk of the distribution than they appear.
 
-```{r enrichment2, fig.height=15}
-top <- all_tidy %>% 
-  filter(prop_Top) %>%
-  select(bc_id) %>%
-  arrange(bc_id) %>%
-  unique()
-
-p1 <- all_tidy %>%
-  arrange(bc_id) %>%
-  filter(bc_id %in% top$bc_id) %>%
-  select(Sample, bc_id, Proportion) %>%
-  mutate(bc_id=factor(as.character(bc_id), levels=as.character(top$bc_id))) %>%
-  ggplot(aes(x=Sample, y=bc_id, fill=Proportion)) +
-    geom_tile(colour='transparent') +
-    # scale_fill_gradient(low="transparent", high="midnightblue") +
-    labs(x='') +
-    theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
-          legend.position = "right",
-          panel.background = element_rect(fill="white"),
-          panel.grid.major = element_line(colour="grey95"))
-
-if (topdf){
-  print ( p1 )
+```{r enrichment_manual}
+if (is.null(params$extra_bc)) {
+  cat("No additional barcodes selected")
 } else {
-  ggplotly( p1, dynamicTicks = TRUE )
+	for (bc in params$extra_bc) {
+	  # bc <- sharedBarcodes$bc_id[1]
+	  
+	  # Create dummy sample with the abundances of the given barcode only.
+	  # Preserve sample order.
+	  tmp <- all_tidy[(bc_id==bc),]
+	  bct <- paste("bc:", bc)
+	  tmp$Sample <- factor(bct, levels=c(sampleNames, bct), ordered=TRUE)
+	  tmp$treatment <- "bc"
+	  tmp2 <- all_tidy[(count_Good),]
+	  tmp2$Sample <- factor(tmp2$Sample, levels=c(sampleNames, bct), ordered=TRUE)
+	  tmp <- rbind(tmp2, tmp)
+	  
+	  print(paste('Barcode', bc))
+	  print(counts$barcode[counts$bc_id==bc])
+	  # print(
+	  #   ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=treatment)) +
+	  #     geom_hline(yintercept=abund_thresh, linetype='dotted') +
+	  #     geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
+	  #     geom_point(data=all_tidy[(bc_id == bc), ], fill=treatCols['bc'], size=2.2, shape=23) +
+	  #     scale_y_log10() +
+	  #     scale_fill_manual(values=treatCols) +
+	  #     ggtitle(paste("Abundance of barcode",bc)) +
+	  #     gth + theme(panel.grid.minor.y = element_line(colour='grey95'))
+	  # )
+	  print(
+	    ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=treatment)) +
+	      geom_hline(yintercept=abund_thresh, linetype='dotted') +
+	      geom_violin() +
+	      geom_boxplot(fill='white', width=0.15, outlier.size = 0.8, outlier.alpha = 0.5, alpha=0.4) +
+	      geom_point(data=all_tidy[(bc_id == bc), ], fill=treatCols['bc'], size=2.2, shape=23) +
+	      scale_y_log10() +
+	      scale_fill_manual(values=treatCols) +
+	      labs(paste("Abundance of barcode",bc), x='') +
+	      gth + theme(panel.grid.minor.y = element_line(colour='grey95'))
+	  )
+	  # print(
+	  #   ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=treatment)) +
+	  #     geom_hline(yintercept=abund_thresh, linetype='dotted') +
+	  #     geom_boxplot(outlier.size = 0.8, outlier.alpha = 0.5) +
+	  #     geom_point(data=all_tidy[(bc_id == bc), ], fill=treatCols['bc'], size=2.2, shape=23) +
+	  #     scale_y_log10() +
+	  #     scale_fill_manual(values=treatCols) +
+	  #     annotation_logticks(base=10, sides='lr') +
+	  #     labs(paste("Abundance of barcode",bc), x='') +
+	  #     gth
+	  # )
+	}
 }
 ```
 

@@ -13,11 +13,12 @@ spec = matrix(c(
   'topdf'           , 'p', 0, "logical",   "Output figures to pdf",
   'refsamps'        , 'r', 1, "character", "Comma-separated list of integers designating the samples to use as reference abundance (in order they appear in summariesFile)",
   'count_thresh'    , 'N', 1, "integer",   "Count threshold for barcodes to analyse",
-  'abund_thresh'    , 'A', 1, "numeric",   "Proportional abundance threshold to consider barcodes top hits"
+  'abund_thresh'    , 'A', 1, "numeric",   "Proportional abundance threshold to consider barcodes top hits",
+  'extrabc'         , 'B', 1, "character", "Comma-separated list of barcode IDs to include in addition to those chosen by the analysis."
 ), byrow=TRUE, ncol=5)
 
 opt = getopt(spec)
-# opt <- list(countsFile='/users/kimon.froussios/obenauf/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_barcode-counts.tsv', summariesFile='/users/kimon.froussios/obenauf/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_summary.tsv', samples='/users/kimon.froussios/obenauf/shona/catch_R9739/description/covars.txt', resultsDir='/users/kimon.froussios/obenauf/shona/catch_R9739/results/', refsamps='1', count_thresh=50, abund_thresh=0.01)
+# opt <- list(countsFile='/users/kimon.froussios/obenauf/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_barcode-counts.tsv', summariesFile='/users/kimon.froussios/obenauf/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_summary.tsv', samples='/users/kimon.froussios/obenauf/shona/catch_R9739/description/covars.txt', resultsDir='/users/kimon.froussios/obenauf/shona/catch_R9739/results/', refsamps='1', count_thresh=50, abund_thresh=0.01, extrabc='3149,3825,326,902,3321,2517,1511,1201,3902,263,468')
 
 if ( !is.null(opt$help) ) {
   cat(getopt(spec, usage=TRUE))
@@ -45,6 +46,10 @@ if ( is.null(opt$refsamps) ) {
   opt$refsamps <- as.integer(strsplit(opt$refsamps, ',', fixed=TRUE)[[1]])
 }
 
+if (! is.null(opt$extrabc) ) {
+  opt$extrabc <- strsplit(opt$extrabc, ',', fixed=TRUE)[[1]]
+  opt$extrabc <- opt$extrabc[order(opt$extrabc)]
+}
 
 rmarkdown::render(opt$reportFile,
                   output_file = sub('.txt|.tsv', '_report.html', basename(opt$countsFile)),
@@ -57,6 +62,7 @@ rmarkdown::render(opt$reportFile,
                               samples = opt$covars,
                               refsamps = opt$refsamps,
                               count_thresh = opt$count_thresh,
-                              abund_thresh = opt$abund_thresh)
+                              abund_thresh = opt$abund_thresh,
+                              extra_bc = opt$extrabc)
 )
 
