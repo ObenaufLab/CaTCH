@@ -7,7 +7,7 @@ output:
     code_folding: hide
     toc: true
     toc_float:
-      toc_collapsed: false
+      collapsed: false
       smooth_scroll: false
 params:
   counts: './null'       # provide valid counts file with all the samples.
