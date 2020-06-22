@@ -133,7 +133,7 @@ Calculate proportions and tidy up the data format.
 # Number of reads and number of detected barcodes in each sample.
 libsizes <- sapply(counts[, cntCols, with=FALSE], sum)
 numBarcodes <- sapply(counts[, cntCols, with=FALSE], function (x) { sum(x>0) } )
-numGoodBarcodes <- sapply(counts[, cntCols, with=FALSE], function (x) { sum(x>count_thresh) } )
+numGoodBarcodes <- sapply(counts[, cntCols, with=FALSE], function (x) { sum(x>=count_thresh) } )
 
 # Barcode abundances as fractions of the library sizes
 relative <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x) { 
@@ -164,8 +164,12 @@ relative_tidy <- melt(relative, id.vars='bc_id', variable.name="Sample", value.n
 relative_tidy[, Sample := factor(relative_tidy$Sample, levels=sampleNames, ordered=TRUE)]
 setorder(relative_tidy, Sample)
 
+# Count filter base donly on the reference (to get around barcode depletions in endpoint samples for correlation purposes)
+counts[, refcount_Good := rowMeans(counts[, params$refsamps + 1, with=FALSE]) >= count_thresh]
+
 # I'll need tidy counts too...
-counts_tidy <- melt(counts[, 2:length(counts)], id.vars='bc_id', variable.name="Sample", value.name="Reads")
+# I'll need tidy counts too...
+counts_tidy <- melt(counts[, 2:length(counts)], id.vars=c('bc_id', 'refcount_Good'), variable.name="Sample", value.name="Reads")
 counts_tidy[, Sample := factor(counts_tidy$Sample, levels=sampleNames, ordered=TRUE)]
 setorder(counts_tidy, Sample)
 
@@ -186,7 +190,7 @@ counts_bool <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x)
                                   if (x=='bc_id') { 
                                     return(counts$bc_id)
                                   } else {          
-                                    return(counts[[x]] > count_thresh)
+                                    return(counts[[x]] >= count_thresh)
                                   }} ))
 names(counts_bool) <- names(counts[, -1, with=FALSE])
 setkey(counts_bool, bc_id)
@@ -209,6 +213,9 @@ all_tidy <- merge(all_tidy, samples_tidy, by.x="Sample", by.y="name")
 all_tidy[, Sample := factor(all_tidy$Sample, levels=sampleNames, ordered=TRUE)]
 setorder(all_tidy, Sample)
 # rm(samples_tidy)
+
+# all_tidy has the counts, don't need them here anymore. But keep it for the sequences.
+counts <- counts[, .(bc_id, barcode)]
 ```
 
 ```{r table}
@@ -295,9 +302,14 @@ if (topdf){
 
 # Correlations 
 
+Correlate using only the barcodes that are on average above threshold in the reference sample(s).
+
 ```{r}
-pheatmap( cor(as.matrix(counts[, ! names(counts) %in% c('barcode', 'bc_id'), with=FALSE], rownames=counts$bc_id)),
-					cluster_rows = FALSE, cluster_cols = FALSE)
+cf <- dcast(all_tidy[(refcount_Good), ], bc_id ~ Sample, value.var='Reads', fill=NA_integer_)
+
+cat(paste('Number of barcodes used:', nrow(cf)))
+
+print( pheatmap( cor(cf[, 2:ncol(cf)]), cluster_rows = FALSE, cluster_cols = FALSE) )
 ```
 
 # Distribution of barcode abundances above threshold
@@ -348,7 +360,8 @@ print( as.data.table(all_tidy %>%
 )
 ```
 
-The colours identify shared barcodes across samples. Grey means the barcode is not shared.
+The colours identify shared barcodes across samples. Grey means the barcode is not shared. 
+The barcodes that are below the threshold are represent by the uncoloured top compartment in each stack.
 
 ```{r complexity_plots2, fig.height=6}
 # Prepare colour fill.
@@ -364,17 +377,17 @@ tmp <- as.data.table(all_tidy %>%
   filter(prop_Top) %>%
   arrange(desc(Proportion)))
 dropped <- unique(all_tidy$Sample)[! unique(all_tidy$Sample) %in% unique(tmp$Sample)]
-tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=0, Reads=0, Proportion=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=NA) )
+tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=0, refcount_Good=0, Reads=0, Proportion=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=NA) )
 fillup <- tmp[, .(Sample, Proportion)] [, 1-sum(Proportion), by=Sample]
 setnames(fillup, c("Sample", "Proportion"))
-tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=0, Reads=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill='fillup')) )
+tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=0, refcount_Good=0, Reads=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill='fillup')) )
 
 # Assign colours
 elem <- as.character(unique(tmp$sharedFill[!is.na(tmp$sharedFill) & ! tmp$sharedFill %in% c('notshared', 'fillup')]))
 elemcol <- getPalette(length(elem))
 names(elemcol) <- elem
-elemcol["notshared"] <- "grey90"
-elemcol["fillup"] <- "black"
+elemcol["notshared"] <- "grey70"
+elemcol["fillup"] <- "grey95"
 
 p1 <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFill, group="A", label=bc_id)) +
          geom_bar(stat='identity', position=position_stack(), colour="black", width=0.9, size=0.2) +
