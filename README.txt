@@ -35,9 +35,9 @@ The exact software versions are provided for reference. Most likely many other c
 
 - One or multiple BAM files containing the CaTCH reads. Each BAM file can be multiplexed or a single sample. No alignment is needed.
 
-- In the case of multiplexed BAMs, a tab-delimited file per BAM containing a table matching the multiplexing tags to sample names. 
-  Each such table should contain 2 named columns: "barcode" and "sample", for the sample tag and sample name.
+- In the case of multiplexed BAMs, a tab-delimited file containing a table matching the multiplexing tags to sample names. The table should contain 2 named columns: "barcode" and "sample", for the sample tag and sample name respectively.
   ie.
+
     barcode sample
     TGAG    reference_1
     TCGG    reference_2
@@ -45,11 +45,12 @@ The exact software versions are provided for reference. Most likely many other c
     ATGGCG  notreatment_2
     ATCTAG  treatmentA_1
     CGAT    treatmentA_2
+
   Demultiplexing tags can be a mix of different lengths, but the shorter ones must not be substrings of the longer ones.
 
-- A file containing the condition allocation for each sample to be included in teh report and the assigned colour for the condition. 
-  It must consist of 3 named columns: "sample", "condition", "colour". Colour must be in an R-compatible string format, one colour per condition.
+- A file containing the condition allocation for each sample to be included in the report and the assigned colour for the condition. It must consist of 3 named columns: "sample", "condition", "colour". Colour must be in an R-compatible string format, one colour per condition.
   ie.
+
     sample  condition   colour
     reference_1 reference   black
     reference_2 reference   black
@@ -71,23 +72,28 @@ barcodingQuantifier.py
 
 Two barcode designs are programmed into the script:
 
-* P7adapter_template_BARCODE_GenotypeTag_SampleTag_NNNNNN_P5adapter  
+(1) P7adapter_template_BARCODE_GenotypeTag_SampleTag_NNNNNN_P5adapter  
                                                      <--- read direction
 
-  In this design the sample tag is included in read1 of the mate pair, and the samples can be demultiplexed by the counting script. 
-  The sample tags are expected to be at a fixed interval from where the barcode is located.
+  In this design the sample tag is included in read1 of the mate pair, and the samples can be demultiplexed by the counting script, if a sample tag table is provided (see input section above). The sample tags are expected to be found at a fixed interval from where the barcode is located.
 
-* P7adapter_SampleTag_template_BARCODE_GenotypeTag_P5adapter
+(2) P7adapter_SampleTag_template_BARCODE_GenotypeTag_P5adapter
                                               <--- read direction
                                                 
-  In this design the sample tag is unlikely to be included in read1 containing the barcode, and therefore must be demultiplexed in advance by your own means.
+  In this design the sample tag is unlikely to be included in read1 containing the barcode, and therefore must be demultiplexed _in_advance_ by other means, not provided here.
+
 
 The genotype tag is not used in the current implementation, except as spacer between the barcode and the sample tag in the first design.
 
 Two versions of the barcode-matching pattern are programmed in, one more stringent than the other:
-stringent: [TC]{1}[ATGC]{2}[AT]{1}[TG]{1}[TGC]{1}[AT]{1}[TGC]{1}[ATGC]{1}[TGC]{1}[ATGC]{1}[ATC]{1}[TGC]{1}[ATGC]{3}[CG]{1}[ATGC]{1}[CGA]{1}CGCCG[TC]{1}[AGTC]{2}[AT]{1}[TG]{1}[TCG]{1}[AT]{1}GCC[ATGC]{1}[ACT]{1}[ATGC]{4}[GC]{1}[AGTC]{1}[CGA]{1}CGCCG'
-nonstringent: 'CGCCG[ATGC]{7}GCC[ATGC]{9}CGCCG'
-The stringent pattern matches from the beginning of the barcode. The non-stringent matches the less variable sequence in the middle of the barcode, and the start of the barcode is found with a fixed offset of 19nt before the pattern.
+
+(1) stringent: 
+[TC]{1}[ATGC]{2}[AT]{1}[TG]{1}[TGC]{1}[AT]{1}[TGC]{1}[ATGC]{1}[TGC]{1}[ATGC]{1}[ATC]{1}[TGC]{1}[ATGC]{3}[CG]{1}[ATGC]{1}[CGA]{1}CGCCG[TC]{1}[AGTC]{2}[AT]{1}[TG]{1}[TCG]{1}[AT]{1}GCC[ATGC]{1}[ACT]{1}[ATGC]{4}[GC]{1}[AGTC]{1}[CGA]{1}CGCCG'
+
+(2) nonstringent: 
+'CGCCG[ATGC]{7}GCC[ATGC]{9}CGCCG'
+
+The stringent pattern matches from the beginning of the barcode to the end. The non-stringent matches the less variable sequence in the middle of the barcode, and the start of the barcode is found with a fixed offset of 19nt before the pattern.
 
 There are currently no parameters to specify a different barcode pattern or different offset of the pattern from the start of the barcode.
 
@@ -109,7 +115,8 @@ barcodingHammingMerge.py
 ------------------------
 
 The merge is based on the Hamming distance between barcodes. That means that only substitutions are considered, no insertions or deletions.
-This step is quite slow.
+This step is very slow.
+It is up to your judgement to apply this step or not, as well as to choose the edit distance.
 
 Parameters:
 -----------
@@ -123,13 +130,14 @@ Parameters:
 mergeBCcounts.R
 ---------------
 
-This is simply a matter of full-merging the tables from Step 2 (or Step 1) and can be achieved in many different ways. 
-The way provided here assumes that all the count files can be found in a common path and have a common pattern in the name.
+This is simply a matter of full-merging the tables from Step 1 (or from Step 2, if you choose to apply it) and can be achieved in many different ways. 
+The way provided here with this script assumes that all the count files can be found in a common path and have a common pattern in the name.
 
 For the barcode counts files, that pattern should be "_barcode-counts.txt"
 For the step1 summaries, that pattern should be "_summary.txt"
 
-A collective table is required each for the barcode-counts and the summaries.
+Please make one collective table for the barcode counts and one for the summaries. Both are needed for the next step.
+
 
 Parameters (positional):
 ------------------------
@@ -143,7 +151,7 @@ Parameters (positional):
 barcoding_results_run.R
 -----------------------
 
-This will compile an HTML report, or output the figures to a PDF file.
+This will compile a report using the barcoding_results_template.Rmd template.
 
 Parameters:
 -----------
@@ -152,8 +160,8 @@ Parameters:
 -d  Directory in which to save all output files.
 -T  The path to barcoding_results_template.Rmd .
 -v  The file assigning samples to conditions and colours (see Input section above)
--p  Instead of an HTML report, output just the figures into a PDF file.
--r  Comma-separated list (without spaces) of integers designating the samples to use as reference abundance (in order they appear in the summaries file) (Default: 1).
--N  Count threshold for barcodes to analyse (Default: 50).
--A  Proportional abundance threshold to consider barcodes top hits (Default: 0.01)
+-p  Instead of an HTML report (more information and more interaction), output just the figures into a PDF file (for Illustrator or presentations).
+-r  Comma-separated list (without spaces) of integers designating the samples to use as reference abundance. The numbers should correspond to the order in which  the samples appear in the collective summaries file) (Default: 1).
+-N  Count threshold for barcodes (Default: 50). The counting generates many low-count barcodes, as a result of sequencing errors. These inflate the number of barcodes, so this threshold is provided to cut out that noise.
+-A  Proportional abundance threshold to consider barcodes top hits (Default: 0.01). Range 0 - 1.
 
