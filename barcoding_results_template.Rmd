@@ -249,7 +249,8 @@ p1 <- ggplot(summaries) +
     geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="stack", colour='black', size=0.25) +
     scale_fill_manual(values=clr) +
     labs(title="Efficiency of barcode detection and sample demultiplication", x='File', y='Fraction of reads') +
-    gth + theme(legend.position = "bottom")
+    gth + theme(legend.position = "none",
+    						axis.title.x = element_blank())
 
 if (topdf){
   print ( p1 )
