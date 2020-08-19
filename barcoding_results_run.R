@@ -18,7 +18,7 @@ spec = matrix(c(
 ), byrow=TRUE, ncol=5)
 
 opt = getopt(spec)
-# opt <- list(countsFile='/users/kimon.froussios/obenauf/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_barcode-counts.tsv', summariesFile='/users/kimon.froussios/obenauf/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_summary.tsv', samples='/users/kimon.froussios/obenauf/shona/catch_R9739/description/covars.txt', resultsDir='/users/kimon.froussios/obenauf/shona/catch_R9739/results/', refsamps='1', count_thresh=50, abund_thresh=0.01, extrabc='3149,3825,326,902,3321,2517,1511,1201,3902,263,468')
+# opt <- list(countsFile='/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_barcode-counts.tsv', summariesFile='/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R9739/process/000000000-G5Y7J_1_20200603B_20200604_summary.tsv', samples='/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R9739/description/covars.txt', resultsDir='/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_R9739/results/', refsamps='1', count_thresh=50, abund_thresh=0.01, extrabc='3149,3825,326,902,3321,2517,1511,1201,3902,263,468')
 
 if ( !is.null(opt$help) ) {
   cat(getopt(spec, usage=TRUE))

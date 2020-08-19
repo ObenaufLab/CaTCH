@@ -20,7 +20,7 @@ params:
   count_thresh: 50       # Barcodes with counts below this will be discarded.
   abund_thresh: 0.01     # Barcodes exceeding this proportional representation are considered top hits.
   extra_bc: '`r NULL`'
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -37,12 +37,11 @@ Input
 ```{r libraries, result="hide", warning=FALSE}
 library(data.table)
 library(magrittr)
-library(dplyr) 
+library(dplyr)
 library(ggplot2)
 library(plotly)
 library(ggrepel)
 library(RColorBrewer)
-library(pheatmap)
 library(patchwork)
 
 # params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$samples, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), topdf = opt$topdf, refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc )
@@ -66,6 +65,8 @@ getPalette <- colorRampPalette(brewer.pal(8, "Paired"))
 
 # Data
 counts <- fread(params$counts)
+
+
 summaries <- fread(params$summaries)
 if (!is.null(params$hammdist)) {
   hammdist <- fread(params$hammdist)
@@ -136,10 +137,10 @@ numBarcodes <- sapply(counts[, cntCols, with=FALSE], function (x) { sum(x>0) } )
 numGoodBarcodes <- sapply(counts[, cntCols, with=FALSE], function (x) { sum(x>=count_thresh) } )
 
 # Barcode abundances as fractions of the library sizes
-relative <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x) { 
-                                  if (x=='bc_id') { 
+relative <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x) {
+                                  if (x=='bc_id') {
                                     return(counts$bc_id)
-                                  } else {          
+                                  } else {
                                     return(counts[[x]] / libsizes[x])
                                   }} ))
 names(relative) <- names(counts[, -1, with=FALSE])
@@ -150,7 +151,7 @@ numBarcodesThresh <- sapply(relative[, 1:(length(relative)-1)], function (x) { s
 
 # Make tidy summary of counts.
 count_summary <- data.table(Count = as.double(c(libsizes, numBarcodes, numGoodBarcodes, numBarcodesThresh)),
-                            Type = factor(c(rep('Reads', length(libsizes)), 
+                            Type = factor(c(rep('Reads', length(libsizes)),
                                             rep('all_BCs', length(numBarcodes)),
                                             rep('fltr_BCs', length(numGoodBarcodes)),
                                             rep('top_Barcodes', length(numBarcodesThresh)) ),
@@ -186,10 +187,10 @@ Create categories.
 
 ```{r categories}
 # Make selection variable for the counts
-counts_bool <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x) { 
-                                  if (x=='bc_id') { 
+counts_bool <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x) {
+                                  if (x=='bc_id') {
                                     return(counts$bc_id)
-                                  } else {          
+                                  } else {
                                     return(counts[[x]] >= count_thresh)
                                   }} ))
 names(counts_bool) <- names(counts[, -1, with=FALSE])
@@ -219,7 +220,7 @@ counts <- counts[, .(bc_id, barcode)]
 ```
 
 ```{r table}
-fwrite(merge(counts[,.(barcode, bc_id)], 
+fwrite(merge(counts[,.(barcode, bc_id)],
              dcast(all_tidy, bc_id ~ Sample, value.var = c("Reads", "Proportion")), on="bc_id"),
        file=paste0(params$outpref, '_data.tsv'), sep="\t", quote=FALSE)
 ```
@@ -271,8 +272,8 @@ fwrite(dcast(count_summary[(Type != "top_Barcodes"), ], Sample ~ Type, value.var
 p1 <- ggplot(data=droplevels(count_summary[(Type != "top_Barcodes"), ]), aes(x=Sample, y=Count, fill=Type))  +
             facet_grid(Type ~ ., scales = "free") +
             geom_bar(stat='identity', width=0.7, size=0.2) +
-            scale_fill_manual(values = c(all_BCs = "mediumorchid2", 
-                                         fltr_BCs = "mediumorchid3", 
+            scale_fill_manual(values = c(all_BCs = "mediumorchid2",
+                                         fltr_BCs = "mediumorchid3",
                                          Reads= "darkgoldenrod2")) +
             scale_y_continuous(expand = expand_scale(mult = c(0, .15)), limits = c(0, NA)) +
             labs(title="Total # of reads, and # of detected barcodes", x='', y='') +
@@ -291,26 +292,228 @@ if (topdf){
   p1 <- ggplot(data=droplevels(count_summary[(Type != "top_Barcodes"), ]), aes(x=Sample, y=Count, fill=Type))  +
           facet_grid(Type ~ ., scales = "free") +
           geom_bar(stat='identity', width=0.7, size=0.2) +
-          scale_fill_manual(values = c(all_BCs = "mediumorchid2", 
-                                       fltr_BCs = "mediumorchid3", 
+          scale_fill_manual(values = c(all_BCs = "mediumorchid2",
+                                       fltr_BCs = "mediumorchid3",
                                        Reads= "darkgoldenrod2")) +
           scale_y_continuous(expand = expand_scale(mult = c(0, .15)), limits = c(0, NA), trans='sqrt') +
           labs(title="Total # of reads, and # of detected barcodes", x='', y='') +
           gth + theme(legend.position = "none")
   print ( p1 )
-} 
+}
 ```
 
-# Correlations 
+# Correlations
 
-Correlate using only the barcodes that are on average above threshold in the reference sample(s).
+Correlate the proportional abundances, using only the barcodes that are on average above the count threshold in the reference sample(s).
 
-```{r}
-cf <- dcast(all_tidy[(refcount_Good), ], bc_id ~ Sample, value.var='Reads', fill=NA_integer_)
+```{r, fig.height=7, fig.width=16}
+my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, method = "pearson", prefix=params$outpref, txs=3) {
+  # Correlations
+  cormat <- cor(mat, method=method)
 
+  # Cluster
+  hcfit <- hclust(dist(scale(cormat, center=TRUE)))
+  rn <- rownames(cormat)
+  cormat <- cormat[samples, samples]                    # Supplied order
+  cormat2 <- cormat                                     # Duplicate on which to delete the diagonal with original order.
+  cormat3 <- cormat[rn[hcfit$order], rn[hcfit$order]]   # Duplicate on which to delete the diagonal with clustered order.
+  cormat4 <- cormat3
+
+  # Delete diagonal half for the numeric labels.
+  for (r in 1:nrow(cormat2)) {
+    for (c in 1:ncol(cormat2)) {
+      if (c <= r) {
+        cormat2[r, c] <- NA_real_
+      }
+    }
+  }
+  for (r in 1:nrow(cormat4)) {
+    for (c in 1:ncol(cormat4)) {
+      if (c <= r) {
+        cormat4[r, c] <- NA_real_
+      }
+    }
+  }
+
+  # Restructure for plotting.
+  rn <- rownames(cormat)
+  cormat <- as.data.table(cormat)
+  cormat[, observation1 := factor(rn, ordered=TRUE, levels=rn)]
+  cormat <- melt(cormat, id.vars = "observation1", value.name = "Correlation", variable.name = "observation2")
+  cormat[, observation2 := factor(observation2, ordered=TRUE, levels=rn)]
+
+  rn2 <- rownames(cormat2)
+  cormat2 <- as.data.table(cormat2)
+  cormat2[, observation1 := factor(rn2, ordered=TRUE, levels=rn2)]
+  cormat2 <- melt(cormat2, id.vars = "observation1", value.name = "Correlation", variable.name = "observation2")
+  cormat2[, observation2 := factor(observation2, ordered=TRUE, levels=rn2)]
+  cormat2 <- cormat2[!is.na(Correlation)]
+
+  rn3 <- rownames(cormat3)
+  cormat3 <- as.data.table(cormat3)
+  cormat3[, observation1 := factor(rn3, ordered=TRUE, levels=rn3)]
+  cormat3 <- melt(cormat3, id.vars = "observation1", value.name = "Correlation", variable.name = "observation2")
+  cormat3[, observation2 := factor(observation2, ordered=TRUE, levels=rn3)]
+
+  rn4 <- rownames(cormat4)
+  cormat4 <- as.data.table(cormat4)
+  cormat4[, observation1 := factor(rn3, ordered=TRUE, levels=rn4)]
+  cormat4 <- melt(cormat4, id.vars = "observation1", value.name = "Correlation", variable.name = "observation2")
+  cormat4[, observation2 := factor(observation2, ordered=TRUE, levels=rn4)]
+  cormat4 <- cormat4[!is.na(Correlation)]
+
+  # Text colour switch for the dynamic range
+  m <- min(cormat4$Correlation, na.rm=TRUE)
+  M <- max(cormat4$Correlation, na.rm=TRUE)
+  colourswitch <- c( m + 0.49 * (M-m),  m + 0.51 * (M-m) )
+
+
+  # Square. Custom order. No values. Full range.
+  p1 <- ggplot(cormat, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    scale_fill_gradientn(limits=c(-1, 1), colors=c("lightskyblue", "dodgerblue3", "darkblue", "black", "darkred", "red", "gold"), na.value = "forestgreen" ) +
+    scale_x_discrete(position = "top") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Square. Custom order. No values. Dynamic range.
+  p1a <- ggplot(cormat, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    scale_fill_gradientn(colors=c("black", "red", "gold", "white"), na.value = "forestgreen" ) +
+    scale_x_discrete(position = "top") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Triangle. Custom order. With values. Full range.
+  p2 <- ggplot(cormat2, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    geom_text(aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=Correlation >= -0.60 & Correlation <= 0.60 ), size=rel(txs)) +
+    scale_x_discrete(position = "top") +
+    scale_fill_gradientn(limits=c(-1, 1), colors=c("lightskyblue", "dodgerblue3", "darkblue", "black", "darkred", "red", "gold"), na.value = "transparent" ) +
+    scale_colour_manual(values=c("black", "white"), na.value="forestgreen", guide="none") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Triangle. Custom order. With values. Dynamic range.
+  p2a <- ggplot(cormat2, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    geom_text(aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=(Correlation <= colourswitch[2]) ), size=rel(txs)) +
+    scale_fill_gradientn(colors=c("black", "red", "gold", "white"), na.value = "transparent" ) +
+    scale_colour_manual(values=c("black", "white"), na.value="transparent", guide="none") +
+    scale_x_discrete(position = "top") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Square. Custom order. With values. Full range.
+  p12 <- ggplot(cormat, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    geom_text(data=cormat2, aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=Correlation >= -0.60 & Correlation <= 0.60 ), size=rel(txs)) +
+    scale_x_discrete(position = "top") +
+    scale_fill_gradientn(limits=c(-1, 1), colors=c("lightskyblue", "dodgerblue3", "darkblue", "black", "darkred", "red", "gold"), na.value = "forestgreen" ) +
+    scale_colour_manual(values=c("black", "white"), na.value="forestgreen", guide="none") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Square. Custom order. With values. Dyhamic range.
+  p12a <- ggplot(cormat, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    geom_text(data=cormat2, aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=(Correlation <= colourswitch[2]) ), size=rel(txs)) +
+    scale_fill_gradientn(colors=c("black", "red", "gold", "white"), na.value = "transparent" ) +
+    scale_colour_manual(values=c("black", "white"), na.value="transparent", guide="none") +
+    scale_x_discrete(position = "top") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+
+  # Square. Clustered order. No values. Full range.
+  p3 <- ggplot(cormat3, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    scale_fill_gradientn(limits=c(-1, 1), colors=c("lightskyblue", "dodgerblue3", "darkblue", "black", "darkred", "red", "gold"), na.value = "forestgreen" ) +
+    scale_x_discrete(position = "top") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Square. Clustered order. No values. Dyhamic range.
+  p3a <- ggplot(cormat3, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    scale_fill_gradientn(colors=c("black", "red", "gold", "white"), na.value = "forestgreen" ) +
+    scale_x_discrete(position = "top") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Triangle. Clustered order. with values. Full range.
+  p4 <- ggplot(cormat4, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    geom_text(aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=Correlation >= -0.60 & Correlation <= 0.60 ), size=rel(txs)) +
+    scale_x_discrete(position = "top") +
+    scale_fill_gradientn(limits=c(-1, 1), colors=c("lightskyblue", "dodgerblue3", "darkblue", "black", "darkred", "red", "gold"), na.value = "forestgreen" ) +
+    scale_colour_manual(values=c("black", "white"), na.value="forestgreen", guide="none") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Triangle. Clustered order. with values. Dyhamic range.
+  p4a <- ggplot(cormat4, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    geom_text(aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=(Correlation <= colourswitch[2]) ), size=rel(txs)) +
+    scale_x_discrete(position = "top") +
+    scale_fill_gradientn(colors=c("black", "red", "gold", "white"), na.value = "transparent" ) +
+    scale_colour_manual(values=c("black", "white"), na.value="transparent", guide="none") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Square. Clustered order. With values. Full range.
+  p34 <- ggplot(cormat3, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    geom_text(data=cormat4, aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=Correlation >= -0.60 & Correlation <= 0.60 ), size=rel(txs)) +
+  	scale_fill_gradientn(limits=c(-1, 1), colors=c("lightskyblue", "dodgerblue3", "darkblue", "black", "darkred", "red", "gold"), na.value = "forestgreen" ) +
+    scale_colour_manual(values=c("black", "white"), na.value="forestgreen", guide="none") +
+    scale_x_discrete(position = "top") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  # Square. Clustered order. With values. Dyhamic range.
+  p34a <- ggplot(cormat3, aes(x=observation1, y=observation2)) +
+    geom_tile(aes(fill=Correlation)) +
+    geom_text(data=cormat4, aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=(Correlation <= colourswitch[2]) ), size=rel(txs)) +
+  	scale_fill_gradientn(colors=c("black", "red", "gold", "white"), na.value = "forestgreen" ) +
+    scale_colour_manual(values=c("black", "white"), na.value="transparent", guide="none") +
+    scale_x_discrete(position = "top") +
+    labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
+    theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
+          panel.grid = element_blank() )
+
+  fwrite(dcast(cormat2, observation1 ~ observation2, value.var = "Correlation"),
+         file=paste0(prefix, '_cor.txt'),
+         sep='\t', quote = FALSE, row.names = FALSE, col.names = TRUE)
+
+
+  return( list(sfrnc=p1, tfrnc=p2, frnc=p12,
+  						 sdrnc=p1a, tdrnc=p2a, drnc=p12a,
+  						 sfrc=p3, tfrc=p4, frc=p34,
+  						 sdrc=p3a, tdrc=p4a, drc=p34a) )
+}
+
+
+cf <- dcast(all_tidy[(refcount_Good), ], bc_id ~ Sample, value.var='Proportion', fill=NA_integer_)
 cat(paste('Number of barcodes used:', nrow(cf)))
 
-print( pheatmap( cor(cf[, 2:ncol(cf)]), cluster_rows = FALSE, cluster_cols = FALSE) )
+
+cplots <- my_pairwise_internal_corels(mat = cf[,2:length(cf)], method='pearson', prefix=paste0(params$outpref, '_pearson'))
+print( cplots[["drnc"]] + cplots[["frc"]] )
+
+cplots <- my_pairwise_internal_corels(mat = cf[,2:length(cf)], method='spearman', prefix=paste0(params$outpref, '_spearman'))
+print( cplots[["drnc"]] + cplots[["frc"]] )
 ```
 
 # Distribution of barcode abundances above threshold
@@ -318,7 +521,7 @@ print( pheatmap( cor(cf[, 2:ncol(cf)]), cluster_rows = FALSE, cluster_cols = FAL
 Mind that the Y-axis scale is **logarithmic**, meaning the distributions are much more top-skewed than they appear.
 
 ```{r proportions}
-p1 <- all_tidy %>% 
+p1 <- all_tidy %>%
     filter(count_Good) %>%
     ggplot(aes(x=Sample, y=Proportion)) +
       geom_violin(aes(fill=treatment), width=1) +
@@ -354,14 +557,14 @@ all_tidy[, is_Shared := bc_id %in% sharedBarcodes$bc_id]
 Top barcodes that are shared among at least 2 samples.
 
 ```{r complexity2}
-print( as.data.table(all_tidy %>% 
+print( as.data.table(all_tidy %>%
          filter(is_Shared, prop_Top) %>%
-         group_by(bc_id) %>% 
+         group_by(bc_id) %>%
          summarise(Samples = paste(Sample, collapse = " ; ")))
 )
 ```
 
-The colours identify shared barcodes across samples. Grey means the barcode is not shared. 
+The colours identify shared barcodes across samples. Grey means the barcode is not shared.
 The barcodes that are below the threshold are represent by the uncoloured top compartment in each stack.
 
 ```{r complexity_plots2, fig.height=6}
@@ -374,7 +577,7 @@ count_summary[, scaledCount := Count / secScale]
 
 # Filter data, then add dummy entries for any samples that have no qualifying barcodes, so they are still shown on the axis.
 # Also fill-in a bulk segment for the barcodes that did not meet the threshold.
-tmp <- as.data.table(all_tidy %>% 
+tmp <- as.data.table(all_tidy %>%
   filter(prop_Top) %>%
   arrange(desc(Proportion)))
 dropped <- unique(all_tidy$Sample)[! unique(all_tidy$Sample) %in% unique(tmp$Sample)]
@@ -409,7 +612,7 @@ if (topdf){
 Number of barcodes passing the counts threshold vs. number of barcodes passing the representation threshold.
 
 ```{r complexity_plots3}
-# The labels can create terrible clutter if the plot is small with lots of points. 
+# The labels can create terrible clutter if the plot is small with lots of points.
 # Plotly enables hover-over to get Sample info
 if (topdf){
   print(
@@ -426,10 +629,10 @@ if (topdf){
   )
 } else {
   ggplotly(
-    ggplot(data=all_tidy %>% 
+    ggplot(data=all_tidy %>%
                   filter(count_Good) %>%
-                  group_by(Sample) %>% 
-                  summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)), 
+                  group_by(Sample) %>%
+                  summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)),
            aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, colour=Treatment)) +
       geom_point(shape=16, size=1, alpha=0.6) +
       scale_colour_manual(values=treatCols) +
@@ -447,7 +650,7 @@ if (topdf){
 All barcodes above the proportion threshold.
 
 ```{r enrichment, fig.height=15}
-top <- all_tidy %>% 
+top <- all_tidy %>%
   filter(prop_Top) %>%
   select(bc_id) %>%
   arrange(bc_id) %>%
@@ -481,7 +684,7 @@ Mind that the Y-axis scale is **logarithmic**. Outliers at the top are much fart
 ```{r enrichment_shared}
 for (bc in sharedBarcodes$bc_id) {
   # bc <- sharedBarcodes$bc_id[1]
-  
+
   # Create dummy sample with the abundances of the given barcode only.
   # Preserve sample order.
   tmp <- all_tidy[(bc_id==bc),]
@@ -491,7 +694,7 @@ for (bc in sharedBarcodes$bc_id) {
   tmp2 <- all_tidy[(count_Good),]
   tmp2$Sample <- factor(tmp2$Sample, levels=c(sampleNames, bct), ordered=TRUE)
   tmp <- rbind(tmp2, tmp)
-  
+
   print(paste('Barcode', bc))
   print(counts$barcode[counts$bc_id==bc])
   # print(
@@ -539,7 +742,7 @@ if (is.null(params$extra_bc)) {
 } else {
 	for (bc in params$extra_bc) {
 	  # bc <- sharedBarcodes$bc_id[1]
-	  
+
 	  # Create dummy sample with the abundances of the given barcode only.
 	  # Preserve sample order.
 	  tmp <- all_tidy[(bc_id==bc),]
@@ -549,7 +752,7 @@ if (is.null(params$extra_bc)) {
 	  tmp2 <- all_tidy[(count_Good),]
 	  tmp2$Sample <- factor(tmp2$Sample, levels=c(sampleNames, bct), ordered=TRUE)
 	  tmp <- rbind(tmp2, tmp)
-	  
+
 	  print(paste('Barcode', bc))
 	  print(counts$barcode[counts$bc_id==bc])
 	  # print(
@@ -600,9 +803,9 @@ if (is.null(params$hammdist)) {
   cat("No info available")
 } else {
   library(ggridges)
-  
+
   hammdist[, clr := vapply(as.character(hammdist$Sample), function(x) { samples_tidy[name==x, colour] }, character(1)) ]
-  
+
   print( ggplot(hammdist, aes(x=HammDist, y=Sample, height=sqrt(BCs), colour=clr, fill=clr) ) +
     geom_density_ridges(stat="identity", scale=1, alpha=0.5) +
     scale_colour_identity() +
@@ -610,10 +813,10 @@ if (is.null(params$hammdist)) {
     labs(title="Distribution of pairwise barcode distances", x = "Hamming distance") +
     gth + theme(axis.text.x = element_text(angle=0))
   )
-  
+
   p1 <- ggplot(hammdist, aes(x=HammDist, group=Sample, y=BCs, colour=clr) ) +
     geom_line() +
-    scale_colour_identity() + 
+    scale_colour_identity() +
     scale_fill_identity() +
     labs(x = "Hamming distance", y="Number of barcode pairs") +
     gth + theme(axis.text.x = element_text(angle=0))
