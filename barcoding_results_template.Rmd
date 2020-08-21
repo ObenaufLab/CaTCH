@@ -235,7 +235,8 @@ if (topdf){
 # Overview of the number of reads allocated per sample
 
 ```{r, fig.height=6, fig.width=7}
-summaries <- melt(summaries, id.vars = "row_ID", variable.name = "file", value.name = "reads")
+if (length(names(summaries)) > 3)
+  summaries <- melt(summaries, id.vars = "row_ID", variable.name = "file", value.name = "reads")
 summaries[, total := sum(.SD$reads), by=file]
 summaries[, rate := reads / total]
 names(summaries)[1] <- "sample"
@@ -581,7 +582,8 @@ tmp <- as.data.table(all_tidy %>%
   filter(prop_Top) %>%
   arrange(desc(Proportion)))
 dropped <- unique(all_tidy$Sample)[! unique(all_tidy$Sample) %in% unique(tmp$Sample)]
-tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=0, refcount_Good=0, Reads=0, Proportion=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=NA) )
+if(length(dropped) > 0)
+  tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=0, refcount_Good=0, Reads=0, Proportion=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=NA) )
 fillup <- tmp[, .(Sample, Proportion)] [, 1-sum(Proportion), by=Sample]
 setnames(fillup, c("Sample", "Proportion"))
 tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=0, refcount_Good=0, Reads=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill='fillup')) )
