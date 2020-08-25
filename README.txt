@@ -5,28 +5,25 @@ They should include everything needed to go from an unaligned .BAM file to barco
 # Requirements #
 ================
 
-The exact software versions are provided for reference. Most likely many other combinations of versions should work too.
+The 3rd-party packages below are needed and must be available/loaded/activated in the working environment before running any of the CaTCH scripts.
+The software versions are provided for reference, most likely many other combinations of versions should work too.
 
 - Python 3 (3.6.7):
-    - os
-    - sys
-    - re
     - argparse
-    - collections
     - pysam
     - Biopython
     - pandas
     - Levenshtein
 
-- R (3.5.1) :
+- R (3.5.1):
     - tidyverse
     - data.table
     - plotly
     - ggrepel
     - RColorBrewer
-    - pheatmap
+    - patchwork
 
-- The python and R scripts provided here.
+- The CaTCH python and R scripts provided here.
 
 
 =========
@@ -60,9 +57,36 @@ The exact software versions are provided for reference. Most likely many other c
     treatmentA_2    treatmentA  red
 
 
+
+
 ============
 # Workflow #
 ============
+
+
+# Steps 1-4 : Pipeline
+======================
+
+The repository contains a shell script (catch_workflow.sh) that automates execution of all the steps, in the presence of a SLURM HPC-cluster system.
+If such is not available, follow the individual steps instead. Steps 1 and 2 do use quite a bit of memory, they are probably not laptop-friendly.
+
+Parameters:
+-----------
+-b <DIR>                Directory with the BAM file(s) to be analysed.
+-c <FILE>               Demultiplexing table, if applicable.
+-o <DIR>                Output directory for the counts files.
+-O <DIR>                Ouptut directory for the analysis report.
+-v <FILE>               List of samples in the desired order, with corresponding condition and corresponding display colour.
+-X <DIR>                Where to find all the scripts for this workflow (probably your local clone of the repository).
+-m <INT>                Hamming distance at which to merge barcodes as likely sequencing errors, if applicable (0 ie. not applicable).
+-n <INT>                Number of dark bases to allow in the pattern (0).
+-A <FLOAT>              Barcode abundance threshold for the report (0.01).
+-R <INT_LIST>           Comma-seperated list of rows in covars to be used as reference samples in the report, NOT counting the header line (1).
+-r                      Reverse complement the sample tags (False).
+-i                      Spike-in barcode was added (False). The spike sequence is hard-coded.
+-s                      Match the full pattern of semi-random barcodes instead of the short pattern (False).
+
+
 
 
 # Step 1 : Count the barcodes
@@ -72,14 +96,14 @@ barcodingQuantifier.py
 
 Two barcode designs are programmed into the script:
 
-(1) P7adapter_template_BARCODE_GenotypeTag_SampleTag_NNNNNN_P5adapter  
+(1) P7adapter_template_BARCODE_GenotypeTag_SampleTag_NNNNNN_P5adapter
                                                      <--- read direction
 
   In this design the sample tag is included in read1 of the mate pair, and the samples can be demultiplexed by the counting script, if a sample tag table is provided (see input section above). The sample tags are expected to be found at a fixed interval from where the barcode is located.
 
 (2) P7adapter_SampleTag_template_BARCODE_GenotypeTag_P5adapter
                                               <--- read direction
-                                                
+
   In this design the sample tag is unlikely to be included in read1 containing the barcode, and therefore must be demultiplexed _in_advance_ by other means, not provided here.
 
 
@@ -87,10 +111,10 @@ The genotype tag is not used in the current implementation, except as spacer bet
 
 Two versions of the barcode-matching pattern are programmed in, one more stringent than the other:
 
-(1) stringent: 
+(1) stringent:
 [TC]{1}[ATGC]{2}[AT]{1}[TG]{1}[TGC]{1}[AT]{1}[TGC]{1}[ATGC]{1}[TGC]{1}[ATGC]{1}[ATC]{1}[TGC]{1}[ATGC]{3}[CG]{1}[ATGC]{1}[CGA]{1}CGCCG[TC]{1}[AGTC]{2}[AT]{1}[TG]{1}[TCG]{1}[AT]{1}GCC[ATGC]{1}[ACT]{1}[ATGC]{4}[GC]{1}[AGTC]{1}[CGA]{1}CGCCG'
 
-(2) nonstringent: 
+(2) nonstringent:
 'CGCCG[ATGC]{7}GCC[ATGC]{9}CGCCG'
 
 The stringent pattern matches from the beginning of the barcode to the end. The non-stringent matches the less variable sequence in the middle of the barcode, and the start of the barcode is found with a fixed offset of 19nt before the pattern.
@@ -99,15 +123,14 @@ There are currently no parameters to specify a different barcode pattern or diff
 
 Parameters:
 -----------
--f --file      A BAM file.
--b --barcodes  File with a demultiplexing table. Completely omit this if data is already demultiplexed.
--r --revcomp   Reverse complement the provided sample tags (default: false)
--i --spikein   Barcode GTGTGTGGAACGAGCACAGCGCCGAGAGACGGATATCACTAGTCGCCGCCATTTGCGCGCGCTCGCC was added as spiked-in (default: false). If true it will be matched explicitly.
--s --stringent Use the more stringent barcode pattern (default: false).
--o --outdir    Output directory for counts (default: ./process/)
---bc_len       Length of the barcode from start position of the match (default: 67).
---gt_len       Genotyping tag length (default: 20).
-
+-f <FILE>           Demultiplexing tags table, regardless of tag length. (tab delimited: Barcode\tSample, with header line). Omit if data already demultiplexed.
+-o <DIR>            Output directory for counts (./process/).
+-r                  Reverse complement the sample tags (default: false).
+-s                  Stringent barcode matching (default: false).
+--bc_len <INT>      Length of the barcode (67).
+--gt_len <INT>      Genotyping tag length (20).
+--n_dark <INT>      Number of dark bases to consider in the barcode pattern (0).
+--spikein           The spike-in barcode was included (default: false).
 
 # Step 2 : Merge barcodes within a certain edit distance (optional)
 ===================================================================
@@ -120,9 +143,9 @@ It is up to your judgement to apply this step or not, as well as to choose the e
 
 Parameters:
 -----------
--b --barcodes A tab delimited file with barcode counts, as produced by the previous step.
--d --hammDist Hamming distance at which barcodes should be considered the same (Default: 1)
--o --outfile  Output file.
+-b <FILE>       A tab delimited file with barcode counts, as produced by the previous step.
+-d <INT>        Hamming distance at which barcodes should be considered the same (Default: 1)
+-o <FILE>       Output file.
 
 
 # Step 3 : Collect all the counts into one table
@@ -130,20 +153,14 @@ Parameters:
 mergeBCcounts.R
 ---------------
 
-This is simply a matter of full-merging the tables from Step 1 (or from Step 2, if you choose to apply it) and can be achieved in many different ways. 
-The way provided here with this script assumes that all the count files can be found in a common path and have a common pattern in the name.
-
-For the barcode counts files, that pattern should be "_barcode-counts.txt"
-For the step1 summaries, that pattern should be "_summary.txt"
-
+This is simply a matter of full-merging the tables from Step 1 (or from Step 2 instead, if you choose to apply it).
 Please make one collective table for the barcode counts and one for the summaries. Both are needed for the next step.
 
 
 Parameters (positional):
 ------------------------
-1. directory path in which to search for barcode counts files with "_barcode-counts.txt" in their name.
-2. output file
-3. file pattern
+1. <FILE>                   Output file.
+2. <FILE> <FILE> ...        Input files.
 
 
 # Step 4 : Compile the report
@@ -155,13 +172,12 @@ This will compile a report using the barcoding_results_template.Rmd template.
 
 Parameters:
 -----------
--c  The collective counts table from step 3.
--s  The collective summaries table from step 3.
--d  Directory in which to save all output files.
--T  The path to barcoding_results_template.Rmd .
--v  The file assigning samples to conditions and colours (see Input section above)
--p  Instead of an HTML report (more information and more interaction), output just the figures into a PDF file (for Illustrator or presentations).
--r  Comma-separated list (without spaces) of integers designating the samples to use as reference abundance. The numbers should correspond to the order in which  the samples appear in the collective summaries file) (Default: 1).
--N  Count threshold for barcodes (Default: 50). The counting generates many low-count barcodes, as a result of sequencing errors. These inflate the number of barcodes, so this threshold is provided to cut out that noise.
--A  Proportional abundance threshold to consider barcodes top hits (Default: 0.01). Range 0 - 1.
-
+-c <FILE>       The collective counts table from step 3.
+-s <FILE>       The collective summaries table from step 3.
+-d <DIR>        Directory in which to save all output files.
+-T <FILE>       The path to barcoding_results_template.Rmd .
+-v <FILE>       The file assigning samples to conditions and colours (see Input section above).
+-p              Instead of an HTML report (more information and more interaction), output just the figures into a PDF file (for Illustrator or presentations).
+-r <INT_LIST>   Comma-separated list (without spaces) of integers designating the samples to use as reference abundance. The numbers should correspond to the order in which  the samples appear in the collective summaries file, not counting the header line) (Default: 1).
+-N <INT>        Count threshold for barcodes (Default: 50). The counting generates many low-count barcodes, as a result of sequencing errors. These inflate the number of barcodes, so this threshold is provided to cut out that noise.
+-A <FLOAT>      Proportional abundance threshold to consider barcodes top hits (Default: 0.01). Range 0 - 1.
