@@ -27,6 +27,9 @@ dark=0
 plot=1
 abund=0.01
 ref=1
+revcomp=0
+spikedin=0
+stringent=0
 # Parse options.
 while getopts 'b:c:o:O:v:X:m:n:A:R:ris1234' flag; do
   case "${flag}" in
@@ -40,9 +43,9 @@ while getopts 'b:c:o:O:v:X:m:n:A:R:ris1234' flag; do
     n) dark="${OPTARG}" ;;        # Number of dark bases to allow in the pattern (0)
     A) abund="${OPTARG}" ;;       # Barcode abundance threshold for the report (0.01).
     R) ref="${OPTARG}" ;;         # Comma seperated list of row numbers in covars to be used as reference samples in report, NOT counting the header line (1).
-    r) revcomp="${OPTARG}" ;;     # Reverse complement the barcodes
-    i) spikedin="${OPTARG}" ;;    # Spike-in barcode was added (hard-coded barcode sequence)
-    s) stringent="${OPTARG}" ;;   # Match full format of semi-random barcodes
+    r) revcomp=1 ;;               # Reverse complement the barcodes
+    i) spikedin=1 ;;              # Spike-in barcode was added (hard-coded barcode sequence)
+    s) stringent=1 ;;             # Match full format of semi-random barcodes
     1) dxcnt=0 ;;                 # Skip demux and count
     2) dist=0 ;;                  # Skip hammind distance merge
     3) post=0 ;;                  # Skip table mergers
@@ -101,19 +104,19 @@ if [ "$dxcnt" -eq 1 ]; then
         barcodes=",-b ${barcodes}"
     fi
 
-    if [ $revcomp ]; then
+    if [ "$revcomp" -eq 1 ]; then
       revcomp=',-r'
     else
       revcomp=''
     fi
 
-    if [ $spikedin ]; then
+    if [ "$spikedin" -eq 1 ]; then
       spikedin=',-i'
     else
       spikedin=''
     fi
 
-    if [ $stringent ]; then
+    if [ "$stringent" -eq 1 ]; then
       stringent=',-s'
     else
       stringent=''
