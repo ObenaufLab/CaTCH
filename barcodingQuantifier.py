@@ -24,7 +24,7 @@ parser.add_argument('-s', "--stringent", action='store_true', help="Stringent ba
 parser.add_argument('-o', "--outdir", type=str, required=False, default="./process", help="Output directory for counts (./process/)")
 parser.add_argument('--bc_len', type=int, default=67, help="Length of the barcode (67).")
 parser.add_argument('--gt_len', type=int, default=20, help="Genotyping tag length (20).")
-parser.add_argument('--n_dark', type=int, default=0, help="Number of dark bases to consifer in the barcode pattern (0).")
+parser.add_argument('--n_dark', type=int, default=0, help="Number of dark bases to consider in the barcode pattern (0).")
 
 args = parser.parse_args()
 
@@ -107,7 +107,7 @@ bc["spike"] = "SpikeIn"               # Diagnostic 2
 
 # Reduce repetitive code
 # This function directly updates the counters in the global scope.
-# Reads that don't match the pattern return False, 
+# Reads that don't match the pattern return False,
 # reads that match the pattern but do not match the demultiplication codes go to fout and return True,
 # reads that match the pattern and a demux code go to the library dict and return True.
 # The diagnostic parameter is used to redirect reads that match special patterns, so they don't confuse things in the library.
@@ -116,10 +116,10 @@ def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args
     match = mypattern.search(myread)
     if match:
         start = match.start(0) - extra               # The pattern is internal to the barcode.
-        barcode = myread[start:(start + bcl)]        
+        barcode = myread[start:(start + bcl)]
         if barcode.count('N') > dark:
             return False
-        
+
         genotyping = myread[(start - gtl):start]     # The genotyping tag is immediately before the barcode.
         if sampleTagLens:
             found = False       # flag to report whether any of the tag lengths resulted in a match
