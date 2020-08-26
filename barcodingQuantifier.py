@@ -156,7 +156,7 @@ with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Chec
                 for record in fin:
                     if recognize(bc_pattern, record, unknown_sample, extra=offset):
                         pass  # Counters and barcode library are updated by the function directly, there is no additional logic to implement.
-                    elif recognize(bc_pattern_dark, record, unknown_sample, extra=offset, dark=args.n_dark):
+                    elif args.n_dark > 0 and recognize(bc_pattern_dark, record, unknown_sample, extra=offset, dark=args.n_dark):
                         pass  # Counters and barcode library are updated by the function directly, there is no additional logic to implement.
                     elif recognize(empty_pattern, record, unknown_sample, diagnostic='empty') :
                         bcStats.update([bc['empty']])    # if demultiplexing, sample-specific diagnostic counts will be handled by recognize()
