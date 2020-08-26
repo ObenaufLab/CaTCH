@@ -1,13 +1,74 @@
 # CaTCH
 
-These are the analysis scripts for the CaTCH experiments.
-They should include everything needed to go from an unaligned .BAM file to barcode counts and an HTML report with various plots, some of which are interactive.
+Catch is available as a command-line tool and as a VBC Galaxy tool.
 
-These instructions apply mainly to command-line use. However, the input formats apply equally to the Galaxy instance.
+## Input
 
+- One or multiple BAM files containing the CaTCH reads. Each BAM file can be multiplexed or a single sample. No alignment is needed.
 
-## Requirements
+- In the case of multiplexed BAMs, a tab-delimited file containing a table matching the multiplexing tags to sample names. 
+The table should contain 2 named columns: "barcode" and "sample", for the sample tag and sample name respectively. 
+Demultiplexing tags can be a mix of different lengths, but the shorter ones must not be substrings of the longer ones.
 
+```
+barcode sample
+TGAG    reference_1
+TCGG    reference_2
+ATCACG  notreatment_1
+ATGGCG  notreatment_2
+ATCTAG  treatmentA_1
+CGAT    treatmentA_2
+```
+
+- A file containing the condition allocation for each sample to be included in the report and the assigned colour for the condition. 
+It must consist of 3 named columns: "sample", "condition", "colour". Colour must be in an R-compatible string format, one colour per condition.
+
+```
+sample  condition   colour
+reference_1 reference   black
+reference_2 reference   black
+notreatment_1   notreatment blue
+notreatment_2   notreatment blue
+treatmentA_1    treatmentA  red
+treatmentA_2    treatmentA  red
+```
+
+## Workflow - VBC Galaxy
+
+### Step 1 : Quantify barcodes
+
+Each BAM file needs to be processed separately. Multiplexed BAMs additionally each require a sample tags table, as per the Input section above.
+A counts table and a summary table will be generated for each sample in the BAM.
+
+Two barcode designs are programmed into the script:
+
+```
+P7adapter_template_BARCODE_GenotypeTag_SampleTag_NNNNNN_P5adapter
+                                                    <--- read direction
+```
+
+In this design the sample tag is included in read1 of the mate pair, and the samples will be demultiplexed by the counting script, according to the sample tag table provided (see Input section above). 
+The sample tags are expected to be found at a fixed interval from where the barcode is located. 
+
+```
+P7adapter_SampleTag_template_BARCODE_GenotypeTag_P5adapter
+                                             <--- read direction
+```
+
+In this design the sample tag is unlikely to be included in read1 containing the barcode, and therefore only one sample is allowed per BAM file.
+
+### Step 2: Collect outputs
+
+The sample-wise outputs need to be merged together. One collective table for the barcode counts, and one collective table for the summaries.
+Our Galaxy server provides some general tools for merging tables.
+
+### Step 3: Visual report
+
+This requires the two collective tables from step 2. Additionally it needs a sample conditions table, as per Input section above.
+
+## Workflow - Command line
+
+### Requirements
 
 The 3rd-party packages below are needed and must be available/loaded/activated in the working environment before running any of the CaTCH scripts.
 The software versions are provided for reference, most likely many other combinations of versions should work too.
@@ -27,50 +88,12 @@ The software versions are provided for reference, most likely many other combina
     - RColorBrewer
     - patchwork
 
-- The CaTCH python and R scripts provided here.
-
-
-
-## Input
-
-
-- One or multiple BAM files containing the CaTCH reads. Each BAM file can be multiplexed or a single sample. No alignment is needed.
-
-- In the case of multiplexed BAMs, a tab-delimited file containing a table matching the multiplexing tags to sample names. The table should contain 2 named columns: "barcode" and "sample", for the sample tag and sample name respectively. Demultiplexing tags can be a mix of different lengths, but the shorter ones must not be substrings of the longer ones.
-  ie.
-
-```
-barcode sample
-TGAG    reference_1
-TCGG    reference_2
-ATCACG  notreatment_1
-ATGGCG  notreatment_2
-ATCTAG  treatmentA_1
-CGAT    treatmentA_2
-```
-
-- A file containing the condition allocation for each sample to be included in the report and the assigned colour for the condition. It must consist of 3 named columns: "sample", "condition", "colour". Colour must be in an R-compatible string format, one colour per condition.
-  ie.
-
-```
-sample  condition   colour
-reference_1 reference   black
-reference_2 reference   black
-notreatment_1   notreatment blue
-notreatment_2   notreatment blue
-treatmentA_1    treatmentA  red
-treatmentA_2    treatmentA  red
-```
-
-
-
-
-## Workflow
 
 ### Steps 1-4 : Pipeline
 
+*catch_workflow.sh*
 
-The repository contains a shell script (catch_workflow.sh) that automates execution of all the steps, in the presence of a SLURM HPC-cluster system.
+The repository contains a shell script that automates execution of all the steps, in the presence of a SLURM scheduler for an HPC-cluster.
 If such is not available, follow the individual steps instead. Steps 1 and 2 do use quite a bit of memory, they are probably not laptop-friendly.
 
 #### Parameters:
@@ -91,10 +114,9 @@ If such is not available, follow the individual steps instead. Steps 1 and 2 do 
 -s              Match the full pattern of semi-random barcodes instead of the short pattern (False).
 ```
 
-### Step 1 : Count the barcodes
+### Step 1 : Quantify barcodes
 
-barcodingQuantifier.py
-
+*barcodingQuantifier.py*
 
 Two barcode designs are programmed into the script:
 
@@ -103,18 +125,16 @@ P7adapter_template_BARCODE_GenotypeTag_SampleTag_NNNNNN_P5adapter
                                                     <--- read direction
 ```
 
-In this design the sample tag is included in read1 of the mate pair, and the samples can be demultiplexed by the counting script, if a sample tag table is provided (see input section above). The sample tags are expected to be found at a fixed interval from where the barcode is located.
+In this design the sample tag is included in read1 of the mate pair, and the samples will be demultiplexed by the counting script, according to the sample tag table provided (see Input section above). 
+The sample tags are expected to be found at a fixed interval from where the barcode is located. 
+*As the tags table is shared among all the BAMs being processed, the same sample tag should not be recycled across BAM files. If sample tags are recycled, process those BAM files in separate iterations of Step 1, using a separate sample tag table for each iteration.*
 
 ```
 P7adapter_SampleTag_template_BARCODE_GenotypeTag_P5adapter
                                              <--- read direction
 ```
 
-In this design the sample tag is unlikely to be included in read1 containing the barcode, and therefore must be demultiplexed IN ADVANCE by other means, not provided here.
-
-
-The genotype tag is not used in either case in the current implementation, except as spacer between the barcode and the sample tag in the first design.
-
+In this design the sample tag is unlikely to be included in read1 containing the barcode, and therefore only one sample is allowed per BAM file.
 
 Two versions of the barcode-matching pattern are programmed in, one more stringent than the other:
 
@@ -130,7 +150,9 @@ Two versions of the barcode-matching pattern are programmed in, one more stringe
 CGCCG[ATGC]{7}GCC[ATGC]{9}CGCCG
 ```
 
-The stringent pattern matches from the beginning of the barcode to the end. The non-stringent matches the less variable sequence in the middle of the barcode, and the start of the barcode is found with a fixed offset of 19nt before the pattern.
+The stringent pattern matches from the beginning of the barcode to the end. The non-stringent matches the less variable sequence in the middle of the barcode, 
+and the start of the barcode is found with a fixed offset of 19nt before the pattern.
+The genotype tag is not used in either case in the current implementation, except as spacer between the barcode and the sample tag in the first design.
 
 There are currently no parameters to specify a different barcode pattern or different offset of the pattern from the start of the barcode.
 
@@ -147,8 +169,7 @@ There are currently no parameters to specify a different barcode pattern or diff
 
 ### Step 2 : Merge barcodes within a certain edit distance (optional)
 
-barcodingHammingMerge.py
-
+*barcodingHammingMerge.py*
 
 The merge is based on the Hamming distance between barcodes. That means that only substitutions are considered, no insertions or deletions.
 This step is very slow.
@@ -162,29 +183,24 @@ It is up to your judgement to apply this step or not, as well as to choose the e
 -o FILE       Output file.
 ```
 
-### Step 3 : Collect all the counts into one table
+### Step 3 : Collect outputs
 
-mergeBCcounts.R
-
+*mergeBCcounts.R*
 
 This is simply a matter of full-merging the tables from Step 1 (or from Step 2 instead, if you chose to apply it).
 Please make one collective table for the barcode counts and one for the summaries. Both are needed for the next step.
 
-
 #### Parameters (positional):
 
 ```
-1. FILE               Output file.
-2. FILE FILE ...      Input files.
+OUTPUT_FILE INPUT_FILE INPUT_FILE ...
 ```
 
+### Step 4 : Visual report
 
-### Step 4 : Compile the report
+*barcoding_results_run.R*
 
-barcoding_results_run.R
-
-
-This will compile a report using the barcoding_results_template.Rmd template.
+This will compile a report using the *barcoding_results_template.Rmd* template.
 
 #### Parameters:
 
@@ -200,3 +216,4 @@ This will compile a report using the barcoding_results_template.Rmd template.
 -A FLOAT      Proportional abundance threshold to consider barcodes top hits (Default: 0.01). Range 0 - 1.
 -B BC_LIST    Comma-separated list of additional barcode IDs that should be included in the report despite not being among the top shared ones. These are the IDs assigned to the barcodes by the report, so you'll need to run the report at least once before.
 ```
+
