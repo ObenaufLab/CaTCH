@@ -11,7 +11,7 @@ files <- args[2:length(args)]
 tables <- lapply(files, function(f) {
 	# f <- files[1]
 	DT <- fread(f)
-	names(DT) <- c(ifelse(grepl('barcode', f), 'barcode', 'sample'), sub('_barcode-counts.txt|summary.txt', '', basename(f)))
+	names(DT) <- c(ifelse(grepl('barcode', f), 'barcode', 'sample'), sub('_barcode-counts.txt|_barcode-counts.tsv|_summary.txt|_summary.tsv', '', basename(f)))
 	DT
 })
 

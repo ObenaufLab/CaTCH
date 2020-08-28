@@ -91,7 +91,8 @@ treatCols <- c(treatCols, bc='white')
 
 # If summaries only has one column of values (ie. one BAM file, or already in long format)
 if (length(summaries) == 2) {
-    names(summaries) <- c('row_ID', 'file')
+    names(summaries) <- c('row_ID', 'reads')
+    summaries[, file := sub('_barcode-counts.txt|_barcode-counts.tsv', '', basename(params$counts), perl=TRUE)]
 } else {
   names(summaries)[1] <- 'row_ID' # need a stable name I can reference
   summaries <- melt(summaries, id.vars = "row_ID", variable.name = "file", value.name = "reads")
@@ -103,9 +104,7 @@ summaries[is.na(summaries)] <- 0
 
 # Reorder/select samples.
 counts <- counts[, c('barcode', sampleNames), with=FALSE]
-if (length(summaries) > 2) {
-  summaries <- summaries[row_ID %in% c("BCUnmatched", "EmptyVector", "SampleUnknown", "SpikeIn", sampleNames)]
-}
+summaries <- summaries[row_ID %in% c("BCUnmatched", "EmptyVector", "SampleUnknown", "SpikeIn", sampleNames)]
 if (!is.null(params$hammdist)) {
   hammdist <- hammdist[Sample %in% sampleNames, ]
   hammdist[, Sample := ordered(Sample, levels=sampleNames)]
@@ -235,8 +234,6 @@ if (topdf){
 # Overview of the number of reads allocated per sample
 
 ```{r, fig.height=6, fig.width=7}
-if (length(names(summaries)) > 3)
-  summaries <- melt(summaries, id.vars = "row_ID", variable.name = "file", value.name = "reads")
 summaries[, total := sum(.SD$reads), by=file]
 summaries[, rate := reads / total]
 names(summaries)[1] <- "sample"
