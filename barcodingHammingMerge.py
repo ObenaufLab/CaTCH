@@ -93,8 +93,8 @@ def natural_sorted(l):
     alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
     return sorted(l, key = alphanum_key)
 
-# print( args.outfile.replace('barcode-counts.txt', 'hammdist.txt') )
-with open(args.outfile.replace('bardode-counts.txt', 'hammdist.txt'), 'w') as f:
+
+with open(args.outfile + 'hammdist.txt'), 'w') as f:
     # f.write("# These are not based on all the pairwise distances, but rather on the distances encountered until a barcode hits a match.\n")
     f.write("# These are based on all the pairwise distances, each pair of barcodes measured once.\n")
     f.write("HammDist\tBCs\tminReads\tmaxReads\tSample\n")
