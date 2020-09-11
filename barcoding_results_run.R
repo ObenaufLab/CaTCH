@@ -27,8 +27,8 @@ if ( !is.null(opt$help) ) {
   q(status=1)
 }
 
-if ( is.null(opt$reportFile) ) {
-  opt$reportFile <- '~/catch/barcoding_results_template.Rmd'
+if ( is.null(opt$reportTemplate) ) {
+  opt$reportTemplate <- '~/catch/barcoding_results_template.Rmd'
 }
 
 if ( is.null(opt$topdf) ) {
@@ -53,7 +53,7 @@ if (! is.null(opt$extrabc) ) {
   opt$extrabc <- opt$extrabc[order(opt$extrabc)]
 }
 
-rmarkdown::render(opt$reportFile,
+rmarkdown::render(opt$reportTemplate,
                   output_file = sub('.txt|.tsv', '_report.html', basename(opt$countsFile)),
                   output_dir = opt$resultsDir,
                   params=list(counts = opt$countsFile,
