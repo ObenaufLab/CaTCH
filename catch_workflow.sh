@@ -124,8 +124,7 @@ if [ "$dxcnt" -eq 1 ]; then
 
     # Match semi-random barcode format, demultiplex, and count the barcodes.
     echo "${prefix}: Demultiplexing and counting barcodes"
-    # ,-o /dev/null ,-e /dev/null
-    ${SCRIPTSPATH}/fileutilities.py T $bam --dir 'bam$' | ${SCRIPTSPATH}/fileutilities.py P --loop sbatch ,-J CaTCHc ,--mem=50G ${SCRIPTSPATH}/barcodingQuantifier.py ,-f {abs} ,-o $outdir ,--n_dark $dark $barcodes $revcomp $spikedin $stringent
+    ${SCRIPTSPATH}/fileutilities.py T $bam --dir 'bam$' | ${SCRIPTSPATH}/fileutilities.py P --loop sbatch ,-o /dev/null ,-e /dev/null ,-J CaTCHc ,--mem=50G ${SCRIPTSPATH}/barcodingQuantifier.py ,-f {abs} ,-o $outdir ,--n_dark $dark $barcodes $revcomp $spikedin $stringent
     wait_for_jobs CaTCHc
 fi
 
