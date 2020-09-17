@@ -155,7 +155,7 @@ fi
 
 if [ "$plot" -eq 1 ]; then
   echo "${prefix}: Compiling barcoding report"
-  srun --mem=9G ${SCRIPTSPATH}/barcoding_results_run.R -c ${outdir}/${prefix}_barcode-counts.txt -s ${outdir}/${prefix}_summaries.txt -d ${resdir}/${prefix} -v $covars -r $ref -A $abund
+  srun --mem=9G ${SCRIPTSPATH}/barcoding_results_run.R -c $(realpath ${outdir}/${prefix}_barcode-counts.txt) -s $(realpath ${outdir}/${prefix}_summaries.txt) -d $(realpath ${resdir}/${prefix}) -v $(realpath $covars) -r $ref -A $abund -p
 fi
 
 
