@@ -16,15 +16,19 @@ from Bio.Seq import Seq
 
 usage = "Barcoding"
 parser = ArgumentParser(description=usage, formatter_class=RawDescriptionHelpFormatter)
-parser.add_argument("-f", "--file", type=str, required=True, dest="bamFile", help="BAM file")
-parser.add_argument("-b", "--barcodes", type=str, required=False, dest="barcodesFile", help="Demultiplexing tags table, regardless of tag length. (tab delimited: Barcode \\t Sample, with header line). Omit if data already demultiplexed.")
-parser.add_argument('-r', "--revcomp", action='store_true', help="Reverse complement barcodes (default: false)")
-parser.add_argument('-i', "--spikein", action='store_true', help="Barcode was spiked-in (default: false)")
-parser.add_argument('-s', "--stringent", action='store_true', help="Stringent barcode matching (default: false)")
-parser.add_argument('-o', "--outdir", type=str, required=False, default="./process", help="Output directory for counts (./process/)")
+
+parser.add_argument("-f", "--file", type=str, required=True, dest="bamFile", help="A single BAM file.")
+parser.add_argument("-b", "--barcodes", type=str, required=False, dest="barcodesFile", help="Table of demultiplex sample tags. Mixed lengths allowed, as long as they don't overlap. Tab delimited: Barcode, Sample, with header line (additional Treatment and Colour fields are tolerated, for convenience). Omit this parameter completely if BAM contains a single sample.")
+parser.add_argument('-o', "--outdir", type=str, required=False, default="./process", help="Output directory (./process/).")
+
+parser.add_argument('-r', "--revcomp", action='store_true', help="Reverse complement the sample tags provided for demultiplexing (False).")
 parser.add_argument('--bc_len', type=int, default=67, help="Length of the barcode (67).")
-parser.add_argument('--gt_len', type=int, default=20, help="Genotyping tag length (20).")
-parser.add_argument('--n_dark', type=int, default=0, help="Number of dark bases to consider in the barcode pattern (0).")
+parser.add_argument('--gt_len', type=int, default=20, help="Number of bases between barcode start and sample tag end (20), used to demultiplex samples. In the Umkehrer/Obenauf design this corresponds to the genotype tag length. Negative values could conceivably work too, to specify a sample tag location after the barcode (not tested)...")
+
+parser.add_argument('-i', "--spikein", action='store_true', help="Also match the hard-coded spike-in barcode pattern.")
+parser.add_argument('-s', "--stringent", action='store_true', help="Use the hard-coded long Umkeherer/Obenauf barcode pattern instead of the short one (False)")
+parser.add_argument('--n_dark', type=int, default=0, help="Number of dark bases to allow in the barcode (0). For this to work, the barcode pattern must include N's for all the positions that are allowed to be dark.")
+parser.add_argument("--pattern", type=str, required=False, help="Custom regex string. Undefined will default to the hard-coded original Umkehrer/Obenauf design.")
 
 args = parser.parse_args()
 
@@ -35,16 +39,28 @@ prefix = os.path.basename(args.bamFile).replace('.bam', '')
 ##############
 
 bc = dict()       # dictionary of sample tags
-tagLens = None     # set of sample tag lengths
+tagLens = None     # set of sample tag lengths. When not none, demultiplexing will be applied.
 if args.barcodesFile:
     with(open(args.barcodesFile, 'r')) as f:
-        # skip header
-        next(f)
+        next(f) # skip header
+        forbidden = re.compile('(^[0-9])|([^0-9a-zA-z_])')
+        problems = False
         for line in f:
-            multiplex, sample = line.rstrip().split("\t")
+            try:
+                multiplex, sample, treatment, colour = line.rstrip().split("\t")   # combined definitions table
+            except ValueError:
+                multiplex, sample = line.rstrip().split("\t")                      # demultiplex-only table
+            # Sanitize
+            match = forbidden.search(sample)
+            if match:
+                problems = True
+                sys.stderr.write('Invalid sample name detected: ' + sample + ' .\n')
             if args.revcomp:
                 multiplex = str(Seq(multiplex).reverse_complement())
             bc[multiplex] = sample
+        if problems:
+            sys.stderr.write('Sample names must: [1] start with a letter, [2] contain no spaces or symbols (except underscore).\n')
+            sys.exit(0)
     tagLens = {len(x) for x in bc}
 else:
     bc["demuxed"] = prefix
@@ -53,37 +69,50 @@ else:
 # Barcode designs
 ##############
 
-    #    20nt                |short end       short start|               19nt
-    # <--GBNSNNNVDNVNVWVMWNNRCGGCGBNSNNNNDNGGCWVMWNNRCGGCGBNSNNNVDNVNVWVMWNNR--<      <- sequencing direction <-
-    #
-    # >--RNNWMVWVNVNDVNNNSNBCGCCGRNNWMVWGCCNDNNNNSNBCGCCGRNNWMVWVNVNDVNNNSNBG-->      strict pattern
-    #    19nt               CGCCGRNNWMVWGCCNDNNNNSNBCGCCG                20nt         short pattern and offsets
-
 # Christian's design:
-    # P7adapter_template_BARCODE_GenotypeTag_SampleINDEX_NNNNNN_P5adapter       <--- read direction, unlikely to get past the template. Sample Index is contained in the read and can be used by this script.
+#     P7adapter_template_BARCODE_GenotypeTag_SampleINDEX_NNNNNN_P5adapter       <--- read direction. Sample Index is contained in the read and can be used to demultiplex.
 # Shona's design:
-    # P7adapter_SampleIndex_template_BARCODE_GenotypeTag_P5adapter              <--- read direction, unlikely to contain the SampleIndex, reads already demultiplexed by sequencing facility using mate pair.
+#     P7adapter_SampleIndex_template_BARCODE_GenotypeTag_P5adapter              <--- read direction, unlikely to contain the SampleIndex,
+#                                                                                    reads must demultiplexed by sequencing facility using the mate read.
 
-# Barcode pattern
+#    20nt                |short end       short start|               19nt
+# <--GBNSNNNVDNVNVWVMWNNRCGGCGBNSNNNNDNGGCWVMWNNRCGGCGBNSNNNVDNVNVWVMWNNR--<      <- sequencing direction <-
+#
+# >--RNNWMVWVNVNDVNNNSNBCGCCGRNNWMVWGCCNDNNNNSNBCGCCGRNNWMVWVNVNDVNNNSNBG-->      strict pattern
+#    19nt               CGCCGRNNWMVWGCCNDNNNNSNBCGCCG                20nt         short pattern and offsets
+
+
+# Umkehrer/Obenauf barcode pattern
 bc_pattern_full = re.compile('[TC]{1}[ATGC]{2}[AT]{1}[TG]{1}[TGC]{1}[AT]{1}[TGC]{1}[ATGC]{1}[TGC]{1}[ATGC]{1}[ATC]{1}[TGC]{1}[ATGC]{3}[CG]{1}[ATGC]{1}[CGA]{1}CGCCG[TC]{1}[AGTC]{2}[AT]{1}[TG]{1}[TCG]{1}[AT]{1}GCC[ATGC]{1}[ACT]{1}[ATGC]{4}[GC]{1}[AGTC]{1}[CGA]{1}CGCCG')
 bc_pattern_short = re.compile('CGCCG[ATGC]{7}GCC[ATGC]{9}CGCCG')
 bc_pattern_dark = re.compile('[CN][GN][CN][CN][GN][ATGCN]{7}[GN][CN][CN][ATGCN]{9}[CN][GN][CN][CN][G]')  # allow dark bases, based on the short pattern.
                                                                                                          # should be ok for high quality sequencing with very few Ns.
                                                                                                          # would be problematic if many Ns are present.
-bc_pattern = None
-offset = None
-if args.stringent:
-    bc_pattern = bc_pattern_full
-    offset = 0      # Pattern matches the whole length of the barcode.
-else:
-    bc_pattern = bc_pattern_short
-    offset = 19    # Compensate for the short pattern starting 20nt internally to the barcode.
 # Empty vector pattern
 empty_pattern = re.compile('AGAGACGGATATCACTAGTCGTCTCCGTTCGCTCTAGACAGGGTACCCAGCATATGATAGGGTCCCCT')
 # Spike-in barcode
-    #            CCTAAAGCTTCTCCTGCCG GTGTGTGGAACGAGCACAGCgccgAGAGACGGATATCACTAGTCgccgCCATTTGCGCGCGCTCGCC
-    # 4mer index     20nt genotyping GTGTGTGGAACGAGCACAGCgccgAGAGACGGATATCACTAGTCgccgCCATTTGCGCGCGCTCGCC
+#            CCTAAAGCTTCTCCTGCCG GTGTGTGGAACGAGCACAGCgccgAGAGACGGATATCACTAGTCgccgCCATTTGCGCGCGCTCGCC
+# 4mer index     20nt genotyping GTGTGTGGAACGAGCACAGCgccgAGAGACGGATATCACTAGTCgccgCCATTTGCGCGCGCTCGCC
 spike_pattern = re.compile('GTGTGTGGAACGAGCACAGCgccgAGAGACGGATATCACTAGTCgccgCCATTTGCGCGCGCTCGCC'.upper())
+
+bc_pattern = None
+offset = 0
+if args.pattern:    # External pattern provided. Invalidates all parameters that apply only to the Umkehrer/Obenauf design.
+    args.stringent = False
+    args.spikein = False
+    empty_pattern = None
+    bc_pattern = re.compile(args.pattern)
+elif args.stringent:
+    bc_pattern = bc_pattern_full
+elif args.n_dark > 0:
+    bc_pattern = bc_pattern_dark
+    offset = 19    # Compensate for the short pattern starting 20nt internally to the barcode.
+else:
+    bc_pattern = bc_pattern_short
+    offset = 19    # Compensate for the short pattern starting 20nt internally to the barcode.
+
+
+
 
 ##############
 # Initialize counters
@@ -100,6 +129,7 @@ bc["unknown"] = "SampleUnknown"       # unrecognized sample tags
 bc["unmatched"] = "BCUnmatched"       # barcode pattern didn't match
 bc["empty"] = "EmptyVector"           # Diagnostic 1
 bc["spike"] = "SpikeIn"               # Diagnostic 2
+unmatchedTags = Counter()
 
 ##############
 # Count the barcodes
@@ -107,11 +137,11 @@ bc["spike"] = "SpikeIn"               # Diagnostic 2
 
 # Reduce repetitive code
 # This function directly updates the counters in the global scope.
-# Reads that don't match the pattern return False,
-# reads that match the pattern but do not match the demultiplication codes go to fout and return True,
+# Reads that don't match the pattern return False (BCUnmatched),
+# reads that match the pattern but do not match the demultiplication codes go to fout (SampleUnknown) and return True,
 # reads that match the pattern and a demux code go to the library dict and return True.
-# The diagnostic parameter is used to redirect reads that match special patterns, so they don't confuse things in the library.
-def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra = 0, diagnostic = None, dark = 0):
+# The diagnostic parameter is used to redirect reads that match special patterns (empty vector, spike-in), so they don't interfere with the library.
+def recognize(mypattern, record, fout, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra = 0, diagnostic = None, dark = 0):
     myread = record.query_sequence.upper()
     match = mypattern.search(myread)
     if match:
@@ -123,9 +153,9 @@ def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args
         genotyping = myread[(start - gtl):start]     # The genotyping tag is immediately before the barcode.
         if sampleTagLens:
             found = False       # flag to report whether any of the tag lengths resulted in a match
-            sampleTag=None
+            sampleTag = None
             for k in sampleTagLens:                   # Flexible length.
-                sampleTag = myread[(start - gtl - k):(start - gtl)].upper()  # The sample tag is either immediately before the gentype tag, or not present.
+                sampleTag = myread[(start - gtl - k):(start - gtl)].upper()  # The sample tag is at a fixed offset from the barcode.
                 if sampleTag in bc:
                     found = True
                     bcStats.update([bc[sampleTag]])             # total hits for the sample
@@ -136,8 +166,10 @@ def recognize(mypattern, record, fout, samples=bc, bcl = args.bc_len, gtl = args
                     break
             if not found and not diagnostic:
                 fout.write(record)
-                bcStats.update([bc["unknown"]])
-                ##library[bc["unknown"]].update([barcode])
+                bcStats.update([ bc["unknown"] ])
+                # Since the sample tag matches none of the known ones, what is it actually?
+                unmatchedTags.update([ myread[(start - gtl - min(sampleTagLens)):(start - gtl)].upper() ])  # In a mixed tag length scenario, always use the shortest length,
+                                                                                                            # to avoid going into random sequence and deflating counts.
         elif not diagnostic:
             bcStats.update([bc["demuxed"]])           # Dummy sample to maintain the code and output format
             library[bc["demuxed"]].update([barcode])
@@ -154,11 +186,9 @@ with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Chec
             with pysam.AlignmentFile(os.path.join(args.outdir, prefix, prefix + "_diagnostic.bam"), 'wb', template=fin) as diagnostic_pattern:
                 # Scan the reads
                 for record in fin:
-                    if recognize(bc_pattern, record, unknown_sample, extra=offset):
+                    if recognize(bc_pattern, record, unknown_sample, extra=offset, dark=args.n_dark):
                         pass  # Counters and barcode library are updated by the function directly, there is no additional logic to implement.
-                    elif args.n_dark > 0 and recognize(bc_pattern_dark, record, unknown_sample, extra=offset, dark=args.n_dark):
-                        pass  # Counters and barcode library are updated by the function directly, there is no additional logic to implement.
-                    elif recognize(empty_pattern, record, unknown_sample, diagnostic='empty') :
+                    elif (empty_pattern is not None) and recognize(empty_pattern, record, unknown_sample, diagnostic='empty') :
                         bcStats.update([bc['empty']])    # if demultiplexing, sample-specific diagnostic counts will be handled by recognize()
                         diagnostic_pattern.write(record)
                     elif args.spikein and recognize(spike_pattern, record, unknown_sample, diagnostic='spike'):
@@ -167,7 +197,6 @@ with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Chec
                     else :
                         # None of the patterns has matched
                         bcStats.update([bc["unmatched"]])
-                        ##library[bc["unmatched"]].update([barcode])
                         unmatched_bc.write(record)
 
 ##############
@@ -176,9 +205,14 @@ with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Chec
 
 samples = sorted(library.keys())
 for sample in samples:
-    with open(os.path.join(args.outdir, prefix, sample.replace('/', '.')) + "_barcode-counts.txt", "w") as fout:
+    with open(os.path.join(args.outdir, prefix, sample.replace('/', '.') + "_barcode-counts.txt"), "w") as fout:
         for v,c in library[sample].most_common():
             fout.write( v + "\t" + str(c) + "\n" )
+
+with open(os.path.join(args.outdir, prefix, prefix + "_rogueTags.txt"), "w") as fout:
+    for v,c in unmatchedTags.most_common():
+        fout.write( v + "\t" + str(c) + "\n" )
+
 
 ##############
 # Demultiplexing report
