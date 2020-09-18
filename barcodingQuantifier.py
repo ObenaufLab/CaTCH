@@ -236,11 +236,14 @@ samples = natural_sorted(bcStats.keys())
 with open(os.path.join(args.outdir, prefix, prefix + "_summary.txt"), "w") as fout:
     for sample in samples:
         fout.write(sample + "\t" + str(bcStats[sample]) + "\n")
+        sys.stdout.write(sample + "\t" + str(bcStats[sample]) + "\n")
 
 
 assigned = pd.DataFrame(bcStats.most_common())
+toprogue = pd.DataFrame(unmatchedTags.most_common()).head()
 notdiagnostic = (assigned.iloc[:, 0] != 'BCUnmatched') & (assigned.iloc[:, 0] != 'SampleUnknown') & (assigned.iloc[:, 0] != 'EmptyVector') & (assigned.iloc[:, 0] != 'SpikeIn')
 if len(unmatchedTags) > 0:
-    if unmatchedTags.most_common()[0][1] > min(assigned[notdiagnostic].iloc[:,1]):
-        sys.stderr.write("It seems there are unassigned sample tags that have more reads than some of your samples. If this is unexpected, maybe the provided sample tags have typos in them or need to be reverse-complemented.\n")
-
+    if toprogue.iloc[0,1] > min(assigned[notdiagnostic].iloc[:,1]):
+        sys.stdout.write("\nIt seems there are unassigned sample tags that have more reads than some of your samples. If this is unexpected, maybe the provided sample tags have typos in them or need to be reverse-complemented.\n")
+        sys.stdout.write(str(toprogue))
+        sys.stdout.write("\n...\n")

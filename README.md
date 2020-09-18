@@ -143,6 +143,9 @@ Additionally, for troubleshooting use, it outputs a BAM with reads where a barco
 a BAM file for reads whose sample tags didn't match the demultiplex info, a text file with the tally of the unmatched sample tags, and a
 BAM file with reads that matched the empty or spike-in patterns in the Obenauf-group design.
 
+On completion, the script will print the extraction summary also to stdout, as well as short info on the detected sample tags that were not assigned (full tally for those "rogue" tags can be ontained from one of the created files).
+
+
 #### Parameters:
 
 ```
