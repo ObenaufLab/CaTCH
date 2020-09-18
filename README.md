@@ -204,14 +204,17 @@ mergeBCcounts.R OUTPUT_FILE INPUT_FILE INPUT_FILE ...
 
 This will compile a report using the *barcoding_results_template.Rmd* template.
 
+*IMPORTANT*
+Please provide full paths to the files and directories. On Linux systems, you can wrap the relative path in `$(realpath FILE)` to avoid typing it in.
+
 #### Parameters:
 
 ```
--c FILE         The collective counts table from step 3.
--s FILE         The collective summaries table from step 3.
--d DIR          Directory in which to save all output files.
--T FILE         The path to barcoding_results_template.Rmd .
--v FILE         The file assigning samples to conditions and colours (see Input section above).
+-c FILE         The collective counts table from step 3. Full path needed.
+-s FILE         The collective summaries table from step 3. Full path needed.
+-d DIR          Directory in which to save all output files. Full path needed.
+-T FILE         The path to barcoding_results_template.Rmd.
+-v FILE         The file assigning samples to conditions and colours (see Input section above). Full path needed.
 -p              In addition to the HTML report, output static figures into a PDF file for Illustrator or presentations (Default: false).
 -r INT_LIST     Comma-separated list (without spaces) of integers designating the samples to use as reference abundance.
                 The numbers should correspond to the order in which  the samples appear in the collective summaries file, not counting the header line) (Default: 1).

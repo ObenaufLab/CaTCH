@@ -4,12 +4,12 @@ library(getopt)
 
 spec = matrix(c(
   'help'            , 'h', 0, "logical",   "Help",
-  'countsFile'      , 'c', 1, "character", "Tab-separated table of counts with the collected counts for the samples.",
-  'summariesFile'   , 's', 1, "character", "Tab-separated table with the collected summaries for the samples.",
-  'hammingFile'     , 'e', 1, "character", "Tab-separated table with the collected hamming distances for the samples.",
-  'resultsDir'      , 'd', 1, "character", "Directory in which to save all output.",
+  'countsFile'      , 'c', 1, "character", "Tab-separated table of counts with the collected counts for the samples. Full path needed.",
+  'summariesFile'   , 's', 1, "character", "Tab-separated table with the collected summaries for the samples. Full path needed.",
+  'hammingFile'     , 'e', 1, "character", "Tab-separated table with the collected hamming distances for the samples. Full path needed.",
+  'resultsDir'      , 'd', 1, "character", "Directory in which to save all output. Full path needed.",
   'reportTemplate'  , 'T', 1, "character", "Template Rmd file for CaTCH report.",
-  'covars'          , 'v', 1, "character", "Table file listing sample names ('Sample') (in desired order), respective condition ('Treatment') and desired colour code ('Colour') (in R-compatible names or #RGB. Preferably avoid white as it is used internally). For convenience, an optional field 'Barcode' is allowed as the first column, to permit using one table for the whole pipeline.",
+  'covars'          , 'v', 1, "character", "Table file listing sample names ('Sample') (in desired order), respective condition ('Treatment') and desired colour code ('Colour') (in R-compatible names or #RGB. Preferably avoid white as it is used internally). For convenience, an optional field 'Barcode' is allowed as the first column, to permit using one table for the whole pipeline. Full path needed.",
   'topdf'           , 'p', 0, "logical",   "Output figures to pdf",
   'refsamps'        , 'r', 1, "character", "Comma-separated list of integers designating the samples to use as reference abundance (in order they appear in summariesFile)",
   'count_thresh'    , 'N', 1, "integer",   "Count threshold for barcodes to analyse",
