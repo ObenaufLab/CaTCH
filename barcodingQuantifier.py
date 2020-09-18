@@ -13,6 +13,7 @@ from collections import Counter
 
 import pysam
 from Bio.Seq import Seq
+import pandas as pd
 
 usage = "Barcoding"
 parser = ArgumentParser(description=usage, formatter_class=RawDescriptionHelpFormatter)
@@ -141,38 +142,37 @@ unmatchedTags = Counter()
 # reads that match the pattern but do not match the demultiplication codes go to fout (SampleUnknown) and return True,
 # reads that match the pattern and a demux code go to the library dict and return True.
 # The diagnostic parameter is used to redirect reads that match special patterns (empty vector, spike-in), so they don't interfere with the library.
-def recognize(mypattern, record, fout, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra = 0, diagnostic = None, dark = 0):
+def recognize(mypattern, record, fout, bcl = args.bc_len, gtl = args.gt_len, sampleTagLens = tagLens, extra = 0, diagnostic = False, dark = 0):
     myread = record.query_sequence.upper()
     match = mypattern.search(myread)
-    if match:
+    if match and not diagnostic:
         start = match.start(0) - extra               # The pattern is internal to the barcode.
         barcode = myread[start:(start + bcl)]
         if barcode.count('N') > dark:
-            return False
+            return True                     # Reject the match. Returning True means I don't need to try the diagnostic patterns.
 
-        genotyping = myread[(start - gtl):start]     # The genotyping tag is immediately before the barcode.
-        if sampleTagLens:
-            found = False       # flag to report whether any of the tag lengths resulted in a match
+        if sampleTagLens:                   # If there is a list of tag lengths, there is a demux table, and we gotta extract the samples tag sequence.
+            found = False            # flag to report whether any of the tag lengths resulted in a match
             sampleTag = None
-            for k in sampleTagLens:                   # Flexible length.
+            for k in sampleTagLens:                   # Allows tags of mixed length
                 sampleTag = myread[(start - gtl - k):(start - gtl)].upper()  # The sample tag is at a fixed offset from the barcode.
                 if sampleTag in bc:
                     found = True
-                    bcStats.update([bc[sampleTag]])             # total hits for the sample
                     if not diagnostic:
-                        library[bc[sampleTag]].update([barcode])    # hits of the barode in the sample
-                    else:
-                        library[bc[sampleTag]].update([diagnostic]) # hits of the diagnostic pattern in the sample
+                        bcStats.update([ bc[sampleTag] ])             # total hits for the sample
+                        library[ bc[sampleTag] ].update([ barcode ])    # hits of the barode in the sample
                     break
-            if not found and not diagnostic:
+            if not found:
                 fout.write(record)
                 bcStats.update([ bc["unknown"] ])
                 # Since the sample tag matches none of the known ones, what is it actually?
                 unmatchedTags.update([ myread[(start - gtl - min(sampleTagLens)):(start - gtl)].upper() ])  # In a mixed tag length scenario, always use the shortest length,
-                                                                                                            # to avoid going into random sequence and deflating counts.
-        elif not diagnostic:
-            bcStats.update([bc["demuxed"]])           # Dummy sample to maintain the code and output format
-            library[bc["demuxed"]].update([barcode])
+                                                                                                            # to avoid going into random sequence and crowding the output.
+        else:
+            bcStats.update([ bc["demuxed"] ])           # Dummy sample to maintain the code logic and output format. Resolves to the file prefix.
+            library[ bc["demuxed"] ].update([ barcode ])
+        return True
+    elif match:
         return True
     else:
         return False
@@ -188,11 +188,11 @@ with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Chec
                 for record in fin:
                     if recognize(bc_pattern, record, unknown_sample, extra=offset, dark=args.n_dark):
                         pass  # Counters and barcode library are updated by the function directly, there is no additional logic to implement.
-                    elif (empty_pattern is not None) and recognize(empty_pattern, record, unknown_sample, diagnostic='empty') :
-                        bcStats.update([bc['empty']])    # if demultiplexing, sample-specific diagnostic counts will be handled by recognize()
+                    elif (empty_pattern is not None) and recognize(empty_pattern, record, unknown_sample, diagnostic=True) :
+                        bcStats.update([ bc['empty'] ])
                         diagnostic_pattern.write(record)
-                    elif args.spikein and recognize(spike_pattern, record, unknown_sample, diagnostic='spike'):
-                        bcStats.update([bc['spike']])    # if demultiplexing, sample-specific diagnostic counts will be handled by recognize()
+                    elif args.spikein and recognize(spike_pattern, record, unknown_sample, diagnostic=True):
+                        bcStats.update([ bc['spike'] ])
                         diagnostic_pattern.write(record)
                     else :
                         # None of the patterns has matched
@@ -209,10 +209,12 @@ for sample in samples:
         for v,c in library[sample].most_common():
             fout.write( v + "\t" + str(c) + "\n" )
 
+###############
+#  Output unmatched sample tag tallies, for troubleshooting
+###############
 with open(os.path.join(args.outdir, prefix, prefix + "_rogueTags.txt"), "w") as fout:
     for v,c in unmatchedTags.most_common():
         fout.write( v + "\t" + str(c) + "\n" )
-
 
 ##############
 # Demultiplexing report
@@ -234,3 +236,11 @@ samples = natural_sorted(bcStats.keys())
 with open(os.path.join(args.outdir, prefix, prefix + "_summary.txt"), "w") as fout:
     for sample in samples:
         fout.write(sample + "\t" + str(bcStats[sample]) + "\n")
+
+
+assigned = pd.DataFrame(bcStats.most_common())
+notdiagnostic = (assigned.iloc[:, 0] != 'BCUnmatched') & (assigned.iloc[:, 0] != 'SampleUnknown') & (assigned.iloc[:, 0] != 'EmptyVector') & (assigned.iloc[:, 0] != 'SpikeIn')
+if len(unmatchedTags) > 0:
+    if unmatchedTags.most_common()[0][1] > min(assigned[notdiagnostic].iloc[:,1]):
+        sys.stderr.write("It seems there are unassigned sample tags that have more reads than some of your samples. If this is unexpected, maybe the provided sample tags have typos in them or need to be reverse-complemented.\n")
+
