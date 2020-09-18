@@ -188,11 +188,11 @@ with pysam.AlignmentFile(args.bamFile, 'rb', check_sq=False) as fin:      # Chec
                 for record in fin:
                     if recognize(bc_pattern, record, unknown_sample, extra=offset, dark=args.n_dark):
                         pass  # Counters and barcode library are updated by the function directly, there is no additional logic to implement.
-                    elif (empty_pattern is not None) and recognize(empty_pattern, record, unknown_sample, diagnostic=True) :
-                        bcStats.update([ bc['empty'] ])
-                        diagnostic_pattern.write(record)
                     elif args.spikein and recognize(spike_pattern, record, unknown_sample, diagnostic=True):
                         bcStats.update([ bc['spike'] ])
+                        diagnostic_pattern.write(record)
+                    elif (empty_pattern is not None) and recognize(empty_pattern, record, unknown_sample, diagnostic=True) :
+                        bcStats.update([ bc['empty'] ])
                         diagnostic_pattern.write(record)
                     else :
                         # None of the patterns has matched
