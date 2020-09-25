@@ -1,3 +1,4 @@
 
 *.pyc
 catch.tar.gz
+.DS_Store
