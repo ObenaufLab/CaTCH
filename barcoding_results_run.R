@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
 
+## version 0.7.0
+
 library(getopt)
 
 spec = matrix(c(

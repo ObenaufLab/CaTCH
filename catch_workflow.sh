@@ -9,6 +9,9 @@
 #SBATCH --output=catch.out
 #SBATCH --error=catch.err
 
+## version 0.7.0
+
+
 function usage() {
     echo "Usage:"
     echo "      $0 -b BAM_DIR -o PROCESS_DIR -O REPORT_DIR -v COVARS [-A ABUND_THRESH] [-R REF_ROWS] [-c DEMUX_BC] [-m HAMMING_DIST] [-X PATH_TO_CATCH_SCRIPTS] [-r] [-i] [-s]"

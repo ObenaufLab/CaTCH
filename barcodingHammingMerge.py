@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-# Date located in: -
+## version 0.5.0
+
+
 # from __future__ import print_function
 import sys, os, re
 from collections import Counter
@@ -8,7 +10,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from Levenshtein import hamming
 
-# It would be cleaner to apply the distance limit directly while quantifying the barcodes. 
+# It would be cleaner to apply the distance limit directly while quantifying the barcodes.
 # But for the benefit of keeping fewer barcodes in the dictionary, the distance must then be computed for every read.
 # Instead, letting the quantifier tally barcodes at identity level and then measuring distances only for the distinct barcodes, reduces the number fo distances calculated.
 # It is still a very slow process.
@@ -45,7 +47,7 @@ with open(args.barcodesFile, 'r') as f:
             for b in list(bc):
                 # Hamming distance is only for equal lengths. Different lengths should not occur under current CaTCH design, but may be diagnostic counts or unforseen irregularities.
                 # Explicitly exclude any diagnostic categories from having their distances compared.
-                if len(b) == len(barcode) and b not in ["unknown", "SampleUnknown", "unmatched", "BCUnmatched", "empty", "EmptyVector", "spike", "SpikeIn"]:   
+                if len(b) == len(barcode) and b not in ["unknown", "SampleUnknown", "unmatched", "BCUnmatched", "empty", "EmptyVector", "spike", "SpikeIn"]:
                     h = hamming(b, barcode)
                     sh = str(h)
                     hbcstat.update([sh])

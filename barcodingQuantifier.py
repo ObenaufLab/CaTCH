@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+## version 0.7.0
+
+
 # Demultiplex samples and count the semi-random barcode occurrences in each.
 
 # Date located in: -
