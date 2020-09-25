@@ -1,5 +1,5 @@
 ---
-title: "Clone survival screens"
+title: "CaTCH report 0.7.1"
 author: "Kimon Froussios"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
@@ -82,6 +82,7 @@ if (length(samples_tidy) == 3) {
 	setnames(samples_tidy, c("name", "treatment", "colour"))
 } else {
 	setnames(samples_tidy, c("tag", "name", "treatment", "colour"))
+	samples_tidy[, tag := NULL]
 }
 samples_tidy[, name := factor(name, ordered=TRUE, levels=name)]
 
