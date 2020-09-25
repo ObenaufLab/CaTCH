@@ -187,7 +187,12 @@ mergeBCcounts.R OUTPUT_FILE INPUT_FILE INPUT_FILE ...
 
 *barcoding_results_run.R*
 
-This will compile a report using the *barcoding_results_template.Rmd* template.
+This will compile a report using the *barcoding_results_template.Rmd* template. It creates
+
+* an HTML report with interactive figures,
+* optionally a PDF static copy of those figures,
+* a table with the counts and percentages of barcodes and their assigned IDs, and
+* a table with the pairwise sample correlations.
 
 *IMPORTANT*
 Please provide full paths to the files and directories. On Linux systems, you can wrap the relative 
