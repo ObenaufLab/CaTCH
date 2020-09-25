@@ -1,4 +1,4 @@
-# CaTCH
+# CaTCH 0.7.1
 
 Catch is available as a command-line tool and as a VBC Galaxy tool.
 
@@ -6,8 +6,8 @@ Catch is available as a command-line tool and as a VBC Galaxy tool.
 
 - One or multiple BAM files containing the CaTCH reads. Each BAM file can be multiplexed or a single sample. No alignment is needed.
 
-- In the case of multiplexed BAMs, a tab-delimited file containing a table matching the multiplexing tags to sample names.
-The table should contain 2 named columns: "barcode" and "sample", for the sample tag and sample name respectively.
+- In the case of multiplexed BAMs, a tab-delimited file containing a table matching the multiplexing tags to sample names must be provided for *each* BAM file.
+The table should contain 2 named columns: "Barcode" and "Sample", for the sample tag and sample name respectively.
 Demultiplexing tags can be a mix of different lengths, but the shorter ones must not be substrings of the longer ones.
 
 ```
@@ -20,8 +20,8 @@ ATCTAG  treatmentA_1
 CGAT    treatmentA_2
 ```
 
-- A file containing the condition allocation for each sample to be included in the report and the assigned colour for the condition.
-It must consist of 3 named columns: "sample", "condition", "colour". Colour must be in an R-compatible string format, one colour per condition.
+- For the compiling of figures, a file listing the samples to be included in the report (in the desired order), as well as the respective treatment/condition and the desired display colour. It must consist of 3 named columns: "Sample", "Treatment", "Colour". 
+Colour must be in an R-compatible string format. For a list of recognized colours, refer here: http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf .
 
 ```
 Sample  Treatment   Colour
@@ -33,8 +33,9 @@ treatmentA_1    treatmentA  red
 treatmentA_2    treatmentA  red
 ```
 
-Alternatively, the above two tables can be combined into a single table for both uses. This is convenient when the input BAM contains all the samples
-to be included in the report.
+Alternatively, for convenience, the above two tables can also be combined into a single table used both for demultiplexing and compiling the report. 
+
+Both the quantifier and report can recognize this format. If using mutiple BAMs, each BAM will still need its own table for demultiplexing, but you can then just combine the rows of the two tables to create the table for the joined report.
 
 ```
 Barcode Sample  Treatment   Colour
@@ -46,7 +47,8 @@ ATCTAG  treatmentA_1    treatmentA  red
 CGAT    treatmentA_2    treatmentA  red
 ```
 
-**In all cases, the order of columns is strictly required!**
+
+**In all cases, the columns must appear in the specified order.**
 
 
 
@@ -54,28 +56,31 @@ CGAT    treatmentA_2    treatmentA  red
 
 The VBCF Galaxy instance is not public. These instructions are for internal institute use only.
 
+Some advanced options made available through Galaxy are discussed in the Command Line sections below.
+
 ### Step 1 : Quantify barcodes
 
-Each BAM file needs to be processed separately. Multiplexed BAMs additionally each require a sample tags table, as per the Input section above.
-A counts table will be generated for each sample and a summary table for each BAM.
+Each BAM file needs to be processed separately. Multiplexed BAMs additionally each require a sample 
+tags table, as per the Input section above. A counts table will be generated for each sample and a 
+summary table for each BAM.
 
-The original Obenauf-group barcode design is hard-coded into the script and is currently the only available option for Galaxy.
-Both C.Umkehrer's and S.Cronin's variants can be used as single sample per BAM file. Umkehrer's variant can also be used with a
-demultiplexing table (as per Input section above).
+The original Obenauf-group barcode design is hard-coded into the script and is currently the only 
+available option for Galaxy. Both C.Umkehrer's and S.Cronin's variants can be used as single sample 
+per BAM file. Umkehrer's variant can also be used with a demultiplexing table (as per Input section above).
 
 Some advanced options made available through Galaxy are discussed in the Command Line sections below.
 
 ### Step 2: Collect outputs
 
-The sample-wise outputs need to be merged together. One collective table for the barcode counts, and one collective table for the summaries.
-There are many ways to join/merge tables using the barcode sequence as row key, in R, Python, Excel, etc, or you can use the catch count merger tool on our Galaxy.
+The sample-wise outputs need to be combined: One collective table for the barcode counts, and one 
+collective table for the summaries. Simply select the Step-1 Galaxy output(s) to combine. Importing
+external tables into Galaxy at this stage is not well supported.
 
 ### Step 3: Visual report
 
-This requires the two collective tables from step 2. Additionally it needs a conditions table, as per Input section above.
-The output is and HTML report.
-
-Some advanced options made available through Galaxy are discussed in the Command Line sections below.
+This requires the two collective tables from step 2. Additionally it needs a conditions table, as per 
+Input section above. The results can be obtained from the zipfile. The main output is an HTML report.
+Tables of the correaltions, counts and proportions are also output.
 
 
 
@@ -85,7 +90,7 @@ This is applicable to anyone who obtains the source code.
 
 ### Requirements
 
-The 3rd-party packages below are needed and must be available/loaded/activated in the working environment before running any of the CaTCH scripts.
+The 3rd-party packages below are needed and must be available/loaded/activated in the working environment before running the CaTCH scripts.
 The versions are provided for reference, most likely many other combinations of versions should work too.
 
 - Python (3.6.7):
@@ -104,46 +109,22 @@ The versions are provided for reference, most likely many other combinations of 
     - patchwork
 
 
-### Steps 1-4 : Pipeline
-
-*catch_workflow.sh*
-
-This is my Bash script to automate the steps of the pipeline. It requires a SLURM environment. Currenlty it only runs the original Obenauf group design.
-I cannot promise it will work for you, but at the very least it can be used as template to write a new pipeline.
-
-Alternatively, the steps can be executed individually, as described in the next sections.
-
-#### Parameters:
-
-```
--b DIR          Directory with the BAM file(s) to be analysed.
--c FILE         Demultiplexing table, if applicable.
--o DIR          Output directory for the counts files.
--O DIR          Ouptut directory for the analysis report.
--v FILE         List of samples in the desired order, with corresponding condition and corresponding display colour.
--X DIR          Where to find all the scripts for this workflow (probably your local clone of the repository).
--m INT          Hamming distance at which to merge barcodes as likely sequencing errors, if applicable (0 ie. not applicable).
--n INT          Number of dark bases to allow in the pattern (0).
--A FLOAT        Barcode abundance threshold for the report (0.01).
--R INT_LIST     Comma-seperated list of rows in covars to be used as reference samples in the report, NOT counting the header line (1).
--r              Reverse complement the sample tags (False).
--i              Spike-in barcode was added (False). The spike sequence is hard-coded.
--s              Match the full pattern of semi-random barcodes instead of the short pattern (False).
-```
-
-
 ### Step 1 : Quantify barcodes
 
 *barcodingQuantifier.py*
 
-Starting from a BAM file and an optional table with demultiplexing info, it uses regex matching to extract the barcode sequence.
-It creates a barcode counts file (per sample), a demultiplication and extraction summary file (per BAM).
+Starting from a BAM file and an optional table with demultiplexing info, it uses regex matching 
+to extract the barcode sequence. It creates 
 
-Additionally, for troubleshooting use, it outputs a BAM with reads where a barcode couldn't be identified (truncation or mutation in inflexible bases),
-a BAM file for reads whose sample tags didn't match the demultiplex info, a text file with the tally of the unmatched sample tags, and a
-BAM file with reads that matched the empty or spike-in patterns in the Obenauf-group design.
+* a barcode counts file per sample, and 
+* an extraction summary file per BAM.
 
-On completion, the script will print the extraction summary also to stdout, as well as short info on the detected sample tags that were not assigned (full tally for those "rogue" tags can be ontained from one of the created files).
+Additionally, for troubleshooting use, it outputs 
+
+* a BAM with reads where a barcode couldn't be identified (truncation, or mutation in inflexible bases),
+* a BAM file for reads whose sample tags didn't match the demultiplex info, 
+* a text file with the tally of the sample tags of the reads that couldn't be demultiplexed, and 
+* a BAM file with reads that matched the empty or spike-in patterns in the Obenauf-group design.
 
 
 #### Parameters:
@@ -170,8 +151,8 @@ On completion, the script will print the extraction summary also to stdout, as w
 
 *barcodingHammingMerge.py*
 
-The idea is to reduce the noise from sequencing errors.
-The merge is based on the Hamming distance between barcodes. That means that only substitutions are considered, no insertions or deletions.
+The idea is to reduce the noise from sequencing errors. The merge is based on the Hamming distance 
+between barcodes. That means that only substitutions are considered, no insertions or deletions.
 It is up to your judgement to apply this step or not, as well as to choose the edit distance.
 
 This step is very slow and resource hungry.
@@ -189,11 +170,12 @@ This step is very slow and resource hungry.
 *mergeBCcounts.R*
 
 Full-join/merge the tables from Step 1 (or from Step 2 instead, if you chose to apply it).
-This can be done in many different ways in R, Python, Excels, etc.
-A script is provided for convenience and consistency. You can provide it with as many input tables as you want.
+This can be done in many different ways, but a script is provided for convenience and consistency. 
+You can provide it with as many input tables as you want.
 
-Please make one collective table for the barcode counts and one for the summaries. Both are needed for the report.
-That means running this script twice, once for all the barcode counts, and once for all the summaries.
+Please make one collective table for the barcode counts and one for the summaries. Both are needed 
+for the report. That means running this script twice, once for all the barcode counts, and once for 
+all the summaries.
 
 #### Usage:
 
@@ -208,7 +190,8 @@ mergeBCcounts.R OUTPUT_FILE INPUT_FILE INPUT_FILE ...
 This will compile a report using the *barcoding_results_template.Rmd* template.
 
 *IMPORTANT*
-Please provide full paths to the files and directories. On Linux systems, you can wrap the relative path in `$(realpath FILE)` to avoid typing it in.
+Please provide full paths to the files and directories. On Linux systems, you can wrap the relative 
+path in the `realphath` command like this `$(realpath FILE)` to avoid typing the full path.
 
 #### Parameters:
 
@@ -227,3 +210,35 @@ Please provide full paths to the files and directories. On Linux systems, you ca
 -B BC_LIST      Comma-separated list of additional barcode IDs that should be included in the report despite not being among the top shared ones.
                 These are the IDs assigned to the barcodes by the report, so you'll need to run the report at least once before you know which extra IDs to provide.
 ```
+
+
+### Steps 1-4 : Pipeline
+
+*catch_workflow.sh*
+
+This is my Bash script to automate the steps of the pipeline. It requires a SLURM environment. 
+Currenlty it only runs the original Obenauf group design.
+I cannot promise it will work for you, but at the very least it can be used as template to write 
+a new pipeline.
+
+Alternatively, the steps can be executed individually, as described in the previous sections.
+
+#### Parameters:
+
+```
+-b DIR          Directory with the BAM file(s) to be analysed.
+-c FILE         Demultiplexing table, if applicable.
+-o DIR          Output directory for the counts files.
+-O DIR          Ouptut directory for the analysis report.
+-v FILE         List of samples in the desired order, with corresponding condition and corresponding display colour.
+-X DIR          Where to find all the scripts for this workflow (probably your local clone of the repository).
+-m INT          Hamming distance at which to merge barcodes as likely sequencing errors, if applicable (0 ie. not applicable).
+-n INT          Number of dark bases to allow in the pattern (0).
+-A FLOAT        Barcode abundance threshold for the report (0.01).
+-R INT_LIST     Comma-seperated list of rows in covars to be used as reference samples in the report, NOT counting the header line (1).
+-r              Reverse complement the sample tags (False).
+-i              Spike-in barcode was added (False). The spike sequence is hard-coded.
+-s              Match the full pattern of semi-random barcodes instead of the short pattern (False).
+```
+
+
