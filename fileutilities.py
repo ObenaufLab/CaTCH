@@ -489,9 +489,11 @@ def main(args):
                     flist.append(fields[0])
     elif params.INPUTTYPE == 'T':
         # Create the FilesList by supplying a direct list of files.
-        flist = FilesList(targets, verbatim=params.verbatim)
+        flist = FilesList(targets, verbatim=False)
     else:
         sys.exit("Unknown INPUTTYPE.")
+
+    outdir, outpref, outsuff = None, None, None
 
     # TASKS ###################################################################
 
@@ -506,7 +508,7 @@ def main(args):
         for c in params.loop:
             command.append(c.lstrip("+"))
         do_foreach(flist, command, out=(outdir, outpref, outsuff),
-                   progress=(params.STDERRcomments), log=params.log)
+                   progress=(False), log=False)
 
 
 
