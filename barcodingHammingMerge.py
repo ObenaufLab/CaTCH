@@ -96,7 +96,7 @@ def natural_sorted(l):
     return sorted(l, key = alphanum_key)
 
 
-with open(args.outfile + 'hammdist.txt'), 'w') as f:
+with open((args.outfile + 'hammdist.txt'), 'w') as f:
     # f.write("# These are not based on all the pairwise distances, but rather on the distances encountered until a barcode hits a match.\n")
     f.write("# These are based on all the pairwise distances, each pair of barcodes measured once.\n")
     f.write("HammDist\tBCs\tminReads\tmaxReads\tSample\n")
