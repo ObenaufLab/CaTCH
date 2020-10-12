@@ -1,14 +1,15 @@
-# CaTCH 0.7.1
+# CaTCH 0.7.2
 
-Catch is available as a command-line tool and as a VBC Galaxy tool.
+Catch is available as a command-line tool for all, and as a VBC Galaxy tool for the members of the Vienna Biocenter.
 
 ## Input
 
-- One or multiple BAM files containing the CaTCH reads. Each BAM file can be multiplexed or a single sample. No alignment is needed.
+- One or multiple BAM files containing the CaTCH reads. Each BAM file can be multiplexed or a single sample.
 
-- In the case of multiplexed BAMs, a tab-delimited file containing a table matching the multiplexing tags to sample names must be provided for *each* BAM file.
+- In the case of multiplexed BAMs, each BAM file must be demultiplexed/counted *individually*. 
+A tab-delimited file containing a table matching the multiplexing tags to sample names must be provided for each BAM file.
 The table should contain 2 named columns: "Barcode" and "Sample", for the sample tag and sample name respectively.
-Demultiplexing tags can be a mix of different lengths, but the shorter ones must not be substrings of the longer ones.
+Demultiplexing tags can be a mix of different lengths, but the short ones must *not* be substrings of the longer ones.
 
 ```
 Barcode Sample
@@ -20,8 +21,8 @@ ATCTAG  treatmentA_1
 CGAT    treatmentA_2
 ```
 
-- For the compiling of figures, a file listing the samples to be included in the report (in the desired order), as well as the respective treatment/condition and the desired display colour. It must consist of 3 named columns: "Sample", "Treatment", "Colour". 
-Colour must be in an R-compatible string format. For a list of recognized colours, refer here: http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf .
+- For colour-coding figures in the report, a file listing the samples to be included in the report (in the desired order), as well as the respective treatment/condition and the desired display colour. Unlike the demultiplexing table, the conditions table is *not optional*. 
+It must consist of 3 named columns: "Sample", "Treatment", "Colour". Colour must be in an R-compatible string format, such as these: http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf .
 
 ```
 Sample  Treatment   Colour
@@ -33,9 +34,7 @@ treatmentA_1    treatmentA  red
 treatmentA_2    treatmentA  red
 ```
 
-Alternatively, for convenience, the above two tables can also be combined into a single table used both for demultiplexing and compiling the report. 
-
-Both the quantifier and report can recognize this format. If using mutiple BAMs, each BAM will still need its own table for demultiplexing, but you can then just combine the rows of the two tables to create the table for the joined report.
+For convenience, the above two tables can also be combined into a single table used both for demultiplexing and compiling the report. Both the quantifier and the report can recognize this format in place of theirs.
 
 ```
 Barcode Sample  Treatment   Colour
@@ -48,39 +47,42 @@ CGAT    treatmentA_2    treatmentA  red
 ```
 
 
-**In all cases, the columns must appear in the specified order.**
+In all three cases, *the columns must appear in the specified order.*
 
 
 
 ## Workflow - VBC Galaxy
 
-The VBCF Galaxy instance is not public. These instructions are for internal institute use only.
-
-Some advanced options made available through Galaxy are discussed in the Command Line sections below.
+The VBC Galaxy instance is not public. These instructions are for internal institute use only. 
+For general use, consult the next section: "Workflow - Command line".
 
 ### Step 1 : Quantify barcodes
 
-Each BAM file needs to be processed separately. Multiplexed BAMs additionally each require a sample 
-tags table, as per the Input section above. A counts table will be generated for each sample and a 
-summary table for each BAM.
+* Each BAM file needs to be processed separately. 
+* Multiplexed BAMs additionally *each* require a sample tags table, as per the Input section above. 
+* A counts table will be generated for each sample and a summary table for each BAM.
 
 The original Obenauf-group barcode design is hard-coded into the script and is currently the only 
 available option for Galaxy. Both C.Umkehrer's and S.Cronin's variants can be used as single sample 
-per BAM file. Umkehrer's variant can also be used with a demultiplexing table (as per Input section above).
+per BAM file. Umkehrer's variant can also be used as a multiplexed BAM with a demultiplexing table 
+as per Input section above.
 
 Some advanced options made available through Galaxy are discussed in the Command Line sections below.
 
 ### Step 2: Collect outputs
 
-The sample-wise outputs need to be combined: One collective table for the barcode counts, and one 
-collective table for the summaries. Simply select the Step-1 Galaxy output(s) to combine. Importing
-external tables into Galaxy at this stage is not well supported.
+The individual sample outputs need to be combined: One collective table for the barcode counts, and one 
+collective table for the summaries. Simply select the Step-1 Galaxy outputs to combine. Importing
+external tables into Galaxy at this stage is *not well supported*. 
 
 ### Step 3: Visual report
 
 This requires the two collective tables from step 2. Additionally it needs a conditions table, as per 
 Input section above. The results can be obtained from the zipfile. The main output is an HTML report.
-Tables of the correaltions, counts and proportions are also output.
+Tables of the correaltions, counts and proportions are also output. 
+*The HTML does not display correctly within Galaxy*, so be sure to *save the zip* file and open the files on 
+your computer instead.
+
 
 
 
@@ -111,15 +113,15 @@ The versions are provided for reference, most likely many other combinations of 
 
 ### Step 1 : Quantify barcodes
 
-*barcodingQuantifier.py*
+**barcodingQuantifier.py**
 
 Starting from a BAM file and an optional table with demultiplexing info, it uses regex matching 
-to extract the barcode sequence. It creates 
+to extract the barcode sequence. It creates:
 
 * a barcode counts file per sample, and 
 * an extraction summary file per BAM.
 
-Additionally, for troubleshooting use, it outputs 
+Additionally, for troubleshooting use, it outputs:
 
 * a BAM with reads where a barcode couldn't be identified (truncation, or mutation in inflexible bases),
 * a BAM file for reads whose sample tags didn't match the demultiplex info, 
@@ -130,18 +132,19 @@ Additionally, for troubleshooting use, it outputs
 #### Parameters:
 
 ```
--f FILE         A single BAM file/
+-f FILE         A single BAM file.
 -b FILE         Demultiplexing tags table. (tab delimited: Barcode\tSample, with header line). Omit if data already demultiplexed.
 -o DIR          Output directory for counts (./process/).
 --revcomp       Reverse complement the sample tags (false).
---bc_len        Length of the barcode.
+--bc_len        Length of the barcode. Determines the size of the sequences extracted from the reads.
 --gt_len        Number of bases between the start of the barcode and the end fo the sample tag. This is tested only for sample tags that precede the barcode
                 and allows a spacer between barcode and sample tag, such as the genotype tag in the Obenauf-group design.
-                Theoretically, negative values should work too, and allow the sample tag to be located after the barcode, but this is untested.
+                Theoretically, negative values should work too and allow the sample tag to be located after the start of the barcode, but this is untested.
 --spikein       Also search for the spike-in barcode (false). Its sequence is hard-coded.
---stringent     Use the full-length pattern (false). This is for the hard-coded Obenauf-group design only. When false, the shorter core pattern is used.
---n_dark INT    Number of dark bases to consider in the barcode pattern (0). This requiresthe pattern to explicitly specify Ns.
-                There is a hard-coded version of the shortObenauf-group design for this.
+--stringent     Use the full-length pattern (false). This is for the hard-coded Obenauf-group design only. When false, the shorter/core pattern is used.
+--n_dark INT    Number of dark/unknown bases (N) to consider in the barcode pattern (0). 
+                For this to have an effect, the provided --pattern must be designed to also match Ns.
+                There is a hard-coded version of the short Obenauf-group design for this.
 --pattern       Barcode pattern as a regex string. This overrides the hard-coded patterns to enable other designs.
                 The regex must begin at the start of the barcode, but doesn't need to reach the end of the barcode.
                 bc_len, gt_len, n_dark are available to use with a custom pattern.
@@ -149,10 +152,11 @@ Additionally, for troubleshooting use, it outputs
 
 ### Step 2 : Merge barcodes within a certain edit distance (optional)
 
-*barcodingHammingMerge.py*
+**barcodingHammingMerge.py**
 
 The idea is to reduce the noise from sequencing errors. The merge is based on the Hamming distance 
-between barcodes. That means that only substitutions are considered, no insertions or deletions.
+between barcodes. That means that only substitutions are considered, no insertions or deletions. When
+barcodes are merged, the sequence of the most abundant is the one that is kept.
 It is up to your judgement to apply this step or not, as well as to choose the edit distance.
 
 This step is very slow and resource hungry.
@@ -167,15 +171,14 @@ This step is very slow and resource hungry.
 
 ### Step 3 : Collect outputs
 
-*mergeBCcounts.R*
+**mergeBCcounts.R**
 
-Full-join/merge the tables from Step 1 (or from Step 2 instead, if you chose to apply it).
-This can be done in many different ways, but a script is provided for convenience and consistency. 
-You can provide it with as many input tables as you want.
+Full-join/merge the tables from Step 1 (or from Step 2 instead, if applicable).
+You can provide as many input tables as you want.
 
-Please make one collective table for the barcode counts and one for the summaries. Both are needed 
-for the report. That means running this script twice, once for all the barcode counts, and once for 
-all the summaries.
+Please make one collective table for the barcode counts *and* one for the summaries. Both are needed 
+for the report. That means running this script twice, once for all the barcode count files, and once for 
+all the summary files.
 
 #### Usage:
 
@@ -185,18 +188,17 @@ mergeBCcounts.R OUTPUT_FILE INPUT_FILE INPUT_FILE ...
 
 ### Step 4 : Visual report
 
-*barcoding_results_run.R*
+**barcoding_results_run.R**
 
-This will compile a report using the *barcoding_results_template.Rmd* template. It creates
+This will compile a report using the **barcoding_results_template.Rmd** template. It creates:
 
 * an HTML report with interactive figures,
 * optionally a PDF static copy of those figures,
 * a table with the counts and percentages of barcodes and their assigned IDs, and
 * a table with the pairwise sample correlations.
 
-*IMPORTANT*
-Please provide full paths to the files and directories. On Linux systems, you can wrap the relative 
-path in the `realphath` command like this `$(realpath FILE)` to avoid typing the full path.
+**IMPORTANT**
+Please provide *full paths* to the files and directories.
 
 #### Parameters:
 
@@ -219,14 +221,13 @@ path in the `realphath` command like this `$(realpath FILE)` to avoid typing the
 
 ### Steps 1-4 : Pipeline
 
-*catch_workflow.sh*
+**catch_workflow.sh**
 
 This is my Bash script to automate the steps of the pipeline. It requires a SLURM environment. 
 Currenlty it only runs the original Obenauf group design.
-I cannot promise it will work for you, but at the very least it can be used as template to write 
-a new pipeline.
 
-Alternatively, the steps can be executed individually, as described in the previous sections.
+**I cannot promise it will work for you**, but at the very least it can be used as template to write 
+a new pipeline. Alternatively, the workflow can be executed directly step by step, as described in the previous sections.
 
 #### Parameters:
 
