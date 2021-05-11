@@ -29,7 +29,7 @@ print( colSums(counts[, names(counts) != id, with=FALSE]) )
 # On-screen report of barcode counts
 print("Barcode Counts")
 print(vapply(counts[, names(counts) != id, with=FALSE], 
-			 function(x) { sum(x>0) }, 
-			 integer(1) ) )
+						 function(x) { sum(x>0) }, 
+						 integer(1) ) )
 
 fwrite(counts, file=out, quote=FALSE, col.names=TRUE, row.names=FALSE, sep="\t")

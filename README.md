@@ -1,54 +1,69 @@
-# CaTCH 0.7.2
+# CaTCH 0.8.0
 
 Catch is available as a command-line tool for all, and as a VBC Galaxy tool for the members of the Vienna Biocenter.
 
 ## Input
 
-- One or multiple BAM files containing the CaTCH reads. Each BAM file can be multiplexed or a single sample.
+1] One or multiple BAM files containing the CaTCH reads. Each BAM file can be multiplexed or a single sample.
 
-- In the case of multiplexed BAMs, each BAM file must be demultiplexed/counted *individually*. 
-A tab-delimited file containing a table matching the multiplexing tags to sample names must be provided for each BAM file.
-The table should contain 2 named columns: "Barcode" and "Sample", for the sample tag and sample name respectively.
-Demultiplexing tags can be a mix of different lengths, but the short ones must *not* be substrings of the longer ones.
+2] In the case of multiplexed BAMs, each BAM file must be demultiplexed/counted *individually*. 
+A tab-delimited file containing a table with the corresponding sequence tags and sample names must be provided for each BAM file.
+The table should contain 2 named columns: `Tag` and `Sample`, for the sample tag and sample name respectively.
+`Tag` can be a mix of tags of different lengths, but the shorter ones must *not* be substrings of the longer ones. 
+`Sample` names should be alphanumeric (`[A-Za-z0-9]`), the first character should be a letter, and they should contain no spaces and no symbols other than underscores (`_`). The sample names should be unique within and across BAM files, even in the case of technical replicates. If whole lanes are replicated, it is easier if you merge the respective BAM files in advance of demultiplexing and counting.
 
 ```
-Barcode Sample
+Tag     Sample
 TGAG    reference_1
 TCGG    reference_2
 ATCACG  notreatment_1
 ATGGCG  notreatment_2
 ATCTAG  treatmentA_1
 CGAT    treatmentA_2
+ATCCC   treatmentB_1
+CAATT   treatmentB_2
 ```
 
-- For colour-coding figures in the report, a file listing the samples to be included in the report (in the desired order), as well as the respective treatment/condition and the desired display colour. Unlike the demultiplexing table, the conditions table is *not optional*. 
-It must consist of 3 named columns: "Sample", "Treatment", "Colour". Colour must be in an R-compatible string format, such as these: http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf .
+3] A tab-delimited table listing the samples to be included in the report (in the desired order), as well as the respective grouping information and the desired display colour. Unlike the demultiplexing table, the conditions table is *not optional*. 
+It must consist of 4 named columns: `Sample`, `Group`, `Treatment`, `Colour`. 
+`Sample` must match the names in the demultiplexing table, if applicable, but may be a subset of those samples. The same rules apply with regards to allowed characters.
+`Group` controls the search for recurring barcodes: The search will take place within each group of samples. This allows shared barcodes to be identified across different treatments while keeping untreated/reference samples out of the mix. It should follow the rules for sample names.
+`Treatment` is the name of the treatment. It should follow the rules for sample names.
+`Colour` controls the display colour of each treatment in plots. It accepts R-compatible color names. A proposed selection of colours to choose from are `black`, `red`, `orange`, `gold`, `blue`, `steelblue`, `dodgerblue`, `forestgreen`, `purple`, and `magenta`, as well as greyscale values (`grey01` through `grey99`).
 
 ```
-Sample  Treatment   Colour
-reference_1 reference   black
-reference_2 reference   black
-notreatment_1   notreatment blue
-notreatment_2   notreatment blue
-treatmentA_1    treatmentA  red
-treatmentA_2    treatmentA  red
+Sample          Group       Treatment    Colour
+reference_1     untreated   reference    black
+reference_2     untreated   reference    black
+notreatment_1   untreated   notreatment  blue
+notreatment_2   untreated   notreatment  blue
+treatmentA_1    treated     treatmentA   red
+treatmentA_2    treated     treatmentA   red
+treatmentB_1    treated     treatmentB   orange
+treatmentB_2    treated     treatmentB   orange
 ```
 
 For convenience, the above two tables can also be combined into a single table used both for demultiplexing and compiling the report. Both the quantifier and the report can recognize this format in place of theirs.
 
 ```
-Barcode Sample  Treatment   Colour
-TGAG    reference_1 reference   black
-TCGG    reference_2 reference   black
-ATCACG  notreatment_1   notreatment blue
-ATGGCG  notreatment_2   notreatment blue
-ATCTAG  treatmentA_1    treatmentA  red
-CGAT    treatmentA_2    treatmentA  red
+Tag     Sample          Group       Treatment     Colour
+TGAG    reference_1     untreated   reference     black
+TCGG    reference_2     untreated   reference     black
+ATCACG  notreatment_1   untreated   notreatment   blue
+ATGGCG  notreatment_2   untreated   notreatment   blue
+ATCTAG  treatmentA_1    treated     treatmentA    red
+CGAT    treatmentA_2    treated     treatmentA    red
+ATCCC   treatmentB_1    treated     treatmentB    orange
+CAATT   treatmentB_2    treated     treatmentB    orange
 ```
 
+_NOTE:_ In all three cases, *the columns must appear in the specified order*.
 
-In all three cases, *the columns must appear in the specified order.*
+_NOTE:_ To avoid problems, all name values (samples, groups, treatments) must:
 
+1. consist of English-alphabet letters, numbers and underscores *only*,
+2. have *no* spaces and *no* punctuation or other special characters,
+3. start with a letter.
 
 
 ## Workflow - VBC Galaxy
@@ -79,7 +94,7 @@ external tables into Galaxy at this stage is *not well supported*.
 
 This requires the two collective tables from step 2. Additionally it needs a conditions table, as per 
 Input section above. The results can be obtained from the zipfile. The main output is an HTML report.
-Tables of the correaltions, counts and proportions are also output. 
+Tables of the correlations, counts and proportions are also output. 
 *The HTML does not display correctly within Galaxy*, so be sure to *save the zip* file and open the files on 
 your computer instead.
 
@@ -240,7 +255,7 @@ a new pipeline. Alternatively, the workflow can be executed directly step by ste
 -X DIR          Where to find all the scripts for this workflow (probably your local clone of the repository).
 -m INT          Hamming distance at which to merge barcodes as likely sequencing errors, if applicable (0 ie. not applicable).
 -n INT          Number of dark bases to allow in the pattern (0).
--A FLOAT        Barcode abundance threshold for the report (0.01).
+-A FLOAT        Barcode abundance threshold for the report. Barcodes must exceed this frequency to be considered abundant (0.01 ie, 1% of reads).
 -R INT_LIST     Comma-seperated list of rows in covars to be used as reference samples in the report, NOT counting the header line (1).
 -r              Reverse complement the sample tags (False).
 -i              Spike-in barcode was added (False). The spike sequence is hard-coded.

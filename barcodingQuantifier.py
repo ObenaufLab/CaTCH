@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-## version 0.7.0
+## version 0.8.0
 
 
 # Demultiplex samples and count the semi-random barcode occurrences in each.
@@ -22,7 +22,7 @@ usage = "Barcoding"
 parser = ArgumentParser(description=usage, formatter_class=RawDescriptionHelpFormatter)
 
 parser.add_argument("-f", "--file", type=str, required=True, dest="bamFile", help="A single BAM file.")
-parser.add_argument("-b", "--barcodes", type=str, required=False, dest="barcodesFile", help="Table of demultiplex sample tags. Mixed lengths allowed, as long as they don't overlap. Tab delimited: Barcode, Sample, with header line (additional Treatment and Colour fields are tolerated, for convenience). Omit this parameter completely if BAM contains a single sample.")
+parser.add_argument("-b", "--barcodes", type=str, required=False, dest="barcodesFile", help="Table of demultiplex sample tags. Mixed lengths allowed, as long as they don't overlap. Tab delimited: Tag, Sample, with header line (additional Group, Treatment and Colour fields are tolerated, for convenience). Omit this parameter completely if BAM contains a single sample.")
 parser.add_argument('-o', "--outdir", type=str, required=False, default="./process", help="Output directory (./process/).")
 
 parser.add_argument('-r', "--revcomp", action='store_true', help="Reverse complement the sample tags provided for demultiplexing (False).")
@@ -51,7 +51,7 @@ if args.barcodesFile:
         problems = False
         for line in f:
             try:
-                multiplex, sample, treatment, colour = line.rstrip().split("\t")   # combined definitions table
+                multiplex, sample, treatgroup, treatment, colour = line.rstrip().split("\t")   # combined definitions table
             except ValueError:
                 multiplex, sample = line.rstrip().split("\t")                      # demultiplex-only table
             # Sanitize

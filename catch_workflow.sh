@@ -9,7 +9,7 @@
 #SBATCH --output=catch.out
 #SBATCH --error=catch.err
 
-## version 0.7.0
+## version 0.7.5
 
 
 function usage() {
@@ -127,7 +127,8 @@ if [ "$dxcnt" -eq 1 ]; then
 
     # Match semi-random barcode format, demultiplex, and count the barcodes.
     echo "${prefix}: Demultiplexing and counting barcodes"
-    ${SCRIPTSPATH}/fileutilities.py T $bam --dir 'bam$' | ${SCRIPTSPATH}/fileutilities.py P --loop sbatch ,-o /dev/null ,-e /dev/null ,-J CaTCHc ,--mem=50G ${SCRIPTSPATH}/barcodingQuantifier.py ,-f {abs} ,-o $outdir ,--n_dark $dark $barcodes $revcomp $spikedin $stringent
+    # ,-o /dev/null ,-e /dev/null 
+    ${SCRIPTSPATH}/fileutilities.py T $bam --dir 'bam$' | ${SCRIPTSPATH}/fileutilities.py P --loop sbatch ,-J CaTCHc ,--mem=50G ,--time=0-03:00:00 ${SCRIPTSPATH}/barcodingQuantifier.py ,-f {abs} ,-o $outdir ,--n_dark $dark $barcodes $revcomp $spikedin $stringent
     wait_for_jobs CaTCHc
 fi
 

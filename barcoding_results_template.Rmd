@@ -1,5 +1,5 @@
 ---
-title: "CaTCH report 0.7.1"
+title: "CaTCH report 0.7.5"
 author: "Kimon Froussios"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
@@ -11,40 +11,30 @@ output:
       smooth_scroll: false
 params:
   counts: './null'       # provide valid counts file with all the samples.
-  summaries: './null'    # provide valid DEseq2-style covariates table file with sample, condition, colour. Can be used to subset the samples included in counts.
-  hammdist: '`r NULL`'     # provide valid tidy table for the hamming distance histograms
-  outpref: './null'     # provide a destination for the output table
-  samples: '`r NULL`'    # provide valid file listing samples, conditions and assigned colours.
-  topdf: False           # redirect plot output to PDF file
-  refsamps: 1            # Which samples to use as reference abundances for naming the barcodes.
-  count_thresh: 50       # Barcodes with counts below this will be discarded.
-  abund_thresh: 0.01     # Barcodes exceeding this proportional representation are considered top hits.
-  extra_bc: '`r NULL`'
-editor_options:
-  chunk_output_type: console
+  summaries: './null'    # provide valid summaries file with all the samples.
+  hammdist: '`r NULL`'   # provide valid tidy table for the hamming distance histograms
+  outpref: './null'      # provide a destination for the output table
+  samples: '`r NULL`'    # provide valid file listing samples, groups, conditions and assigned colours.
+  refsamps: 1            # Which samples to use as reference abundances for naming the barcodes (as listed in the file provided for the samples parameter).
+  count_thresh: 10       # Barcodes with counts below this will be discarded.
+  abund_thresh: 0.005     # Barcodes exceeding this proportional representation are considered top hits.
+  extra_bc: '`r NULL`'   # Comma-separated list of manually selected barcode IDs.
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
-```
 
-Several plots in this report are interactive, so be sure to hover your pointer over them!
-
-# Preparation
-
-Input
-
-```{r libraries, result="hide", message=FALSE}
 library(data.table)
 library(magrittr)
 library(dplyr)
 library(ggplot2)
 library(plotly)
 library(ggrepel)
+library(ggridges)
 library(RColorBrewer)
 library(patchwork)
 
-# params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), topdf = opt$topdf, refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
+# params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
 
 # ggplot2 theme.
 gth <- theme(axis.line.x= element_line(),
@@ -61,12 +51,39 @@ gth <- theme(axis.line.x= element_line(),
 	         legend.position = "none"
 )
 
-getPalette <- colorRampPalette(brewer.pal(8, "Paired"))
+mycolours <- c(
+	"#bb6600", "#880000", "#bb3300", "#ff0000", "#ff9900", "#ffcc00", "#eedd00",
+	"#0000ff", "#0066ff", "#0099ff", "#00ccff",  "#00ffff",
+	"#5500aa", "#8800ff", "#8866ff", "#ee00bb", "#ff66ff",  "#ff99ff", "#ffccff",  
+	
+	"#224400", "#226600", "#229900", "#22cc00", "#22ff00", "#88cc00", 
+	"#8899aa",
+	"#0033aa", "#0066aa", "#0099aa", "#00ccaa", 
+	"#886600", "#bb9900", "#889900", 
+	"#8800aa", "#8866aa", "#8899ff", "#88ccff", 
+	"#ff7700", "#ee99aa", "#eeccaa"
+)
 
+# This works best when the colours are in a sensible sequence of gradual change.
+getPalette <- colorRampPalette(mycolours[1:25])
+
+# Reshuffle colours for more contrast at low usage in the plots.
+mycolours <- mycolours[c(2,8,13,20, 3,9,14,21, 1,10,15,22, 4,11,16,23, 
+												 5,12,17,24, 6,18,25, 7,19,26, 
+												 27,31,34,38, 28,32,35,39, 29,33,36,40, 30,37)]
+
+# Thresholds
+count_thresh = params$count_thresh
+abund_thresh <- params$abund_thresh
+```
+
+Several plots in this report are interactive, so be sure to hover your pointer over them!
+
+# Preparation
+
+```{r libraries, result="hide", message=FALSE}
 # Data
 counts <- fread(params$counts)
-
-
 summaries <- fread(params$summaries)
 if (!is.null(params$hammdist)) {
   hammdist <- fread(params$hammdist)
@@ -78,20 +95,14 @@ topdf <- params$topdf
 
 # Set sample order.
 samples_tidy <- fread(params$samples)
-if (length(samples_tidy) == 3) {
-	setnames(samples_tidy, c("name", "treatment", "colour"))
-} else {
-	setnames(samples_tidy, c("tag", "name", "treatment", "colour"))
-	samples_tidy[, tag := NULL]
-}
-samples_tidy[, name := factor(name, ordered=TRUE, levels=name)]
+samples_tidy[, Sample := factor(Sample, ordered=TRUE, levels=Sample)]
 
 # Set treatment colours
-sampleNames <- as.character(samples_tidy$name)
-tc <- unique(samples_tidy[, .(treatment, colour)])
-treatCols <- tc$colour
-names(treatCols) <- tc$treatment
-samples_tidy[, colour := NULL]
+sampleNames <- as.character(samples_tidy$Sample)
+tc <- unique(samples_tidy[, .(Treatment, Colour)])
+treatCols <- tc$Colour
+names(treatCols) <- tc$Treatment
+samples_tidy[, Colour := NULL]
 treatCols <- c(treatCols, bc='white')
 
 # If summaries only has one column of values (ie. one BAM file, or already in long format)
@@ -102,10 +113,6 @@ if (length(summaries) == 2) {
   names(summaries)[1] <- 'row_ID' # need a stable name I can reference
   summaries <- melt(summaries, id.vars = "row_ID", variable.name = "file", value.name = "reads")
 }
-
-# Plug any gaps from undetected barcodes.
-counts[is.na(counts)] <- 0
-summaries[is.na(summaries)] <- 0
 
 # Reorder/select samples.
 counts <- counts[, c('barcode', sampleNames), with=FALSE]
@@ -120,25 +127,20 @@ setorderv(counts, names(counts)[c(params$refsamps)+1], order=-1)
 counts[, bc_id := 1:nrow(counts)]
 setkey(counts, bc_id)
 
-# Get rid of barcodes not seen in the samples (as a result of subsetting the samples).
-# Do this after assigning bc_ids so bc_id  is consistent across different analyses with the same reference samples.
+# Get rid of barcodes not seen in any of the samples (as a result of subsetting the samples).
+# Do this after assigning bc_ids so bc_id is consistent across different analyses with the same reference samples.
+l1 <- nrow(counts)
 counts <- counts[rowSums(counts[, 2:length(counts)]) != 0, ]
+message(paste(l1 - nrow(counts), "BCs not seen at all among this selection of samples."))
 
 # Vector of counts columns.
 cntCols <- 2:(length(counts)-1)
-
-# Thresholds
-count_thresh = params$count_thresh
-abund_thresh <- params$abund_thresh
 ```
-
-Calculate proportions and tidy up the data format.
 
 ```{r tidydata}
 # Number of reads and number of detected barcodes in each sample.
 libsizes <- sapply(counts[, cntCols, with=FALSE], sum)
 numBarcodes <- sapply(counts[, cntCols, with=FALSE], function (x) { sum(x>0) } )
-numGoodBarcodes <- sapply(counts[, cntCols, with=FALSE], function (x) { sum(x>=count_thresh) } )
 
 # Barcode abundances as fractions of the library sizes
 relative <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x) {
@@ -149,90 +151,30 @@ relative <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x) {
                                   }} ))
 names(relative) <- names(counts[, -1, with=FALSE])
 setkey(relative, bc_id)
-
-# Minimum barcode representation threshold
-numBarcodesThresh <- sapply(relative[, 1:(length(relative)-1)], function (x) { sum(x >= abund_thresh) } )
-
-# Make tidy summary of counts.
-count_summary <- data.table(Count = as.double(c(libsizes, numBarcodes, numGoodBarcodes, numBarcodesThresh)),
-                            Type = factor(c(rep('Reads', length(libsizes)),
-                                            rep('all_BCs', length(numBarcodes)),
-                                            rep('fltr_BCs', length(numGoodBarcodes)),
-                                            rep('top_Barcodes', length(numBarcodesThresh)) ),
-                                          levels= c('all_BCs', 'fltr_BCs', 'top_Barcodes', 'Reads')),
-                            Sample = c(names(libsizes), names(numBarcodes), names(numGoodBarcodes), names(numBarcodesThresh)) )
-count_summary[, Sample := factor(count_summary$Sample, levels=sampleNames, ordered=TRUE)]
-setorder(count_summary, Sample)
-
-# Make the proportions tidy too.
 relative_tidy <- melt(relative, id.vars='bc_id', variable.name="Sample", value.name="Proportion")
 relative_tidy[, Sample := factor(relative_tidy$Sample, levels=sampleNames, ordered=TRUE)]
 setorder(relative_tidy, Sample)
 
-# Count filter base donly on the reference (to get around barcode depletions in endpoint samples for correlation purposes)
-counts[, refcount_Good := rowMeans(counts[, params$refsamps + 1, with=FALSE]) >= count_thresh]
-
-# I'll need tidy counts too...
-# I'll need tidy counts too...
-counts_tidy <- melt(counts[, 2:length(counts)], id.vars=c('bc_id', 'refcount_Good'), variable.name="Sample", value.name="Reads")
+# Tidy counts
+counts_tidy <- melt(counts[, 2:length(counts)], id.vars=c('bc_id'), variable.name="Sample", value.name="Reads")
 counts_tidy[, Sample := factor(counts_tidy$Sample, levels=sampleNames, ordered=TRUE)]
-setorder(counts_tidy, Sample)
+setorder(counts_tidy, Sample, bc_id)
 
 # Now bring it all together.
 all_tidy <- merge(counts_tidy, relative_tidy, by=c("bc_id", "Sample"))
 all_tidy[, Sample := factor(all_tidy$Sample, levels=sampleNames, ordered=TRUE)]
-setorder(all_tidy, Sample)
+setorder(all_tidy, Sample, bc_id )
 
-# rm(relative_tidy)
-# rm(counts_tidy)
+counts[, bc_id := paste0('bc', bc_id)]
+bclevels <- counts[, bc_id]
+counts[, bc_id := factor(bc_id, ordered=TRUE, levels=bclevels)]
+all_tidy[, bc_id := factor(paste0('bc', bc_id), ordered=TRUE, levels=bclevels)]
+counts_tidy[, bc_id := factor(paste0('bc', bc_id), ordered=TRUE, levels=bclevels)]
 ```
-
-Create categories.
-
-```{r categories}
-# Make selection variable for the counts
-counts_bool <- as.data.table(lapply(names(counts[, -1, with=FALSE]), function(x) {
-                                  if (x=='bc_id') {
-                                    return(counts$bc_id)
-                                  } else {
-                                    return(counts[[x]] >= count_thresh)
-                                  }} ))
-names(counts_bool) <- names(counts[, -1, with=FALSE])
-setkey(counts_bool, bc_id)
-
-counts_bool_tidy <- melt(counts_bool, id.vars='bc_id', variable.name="Sample", value.name="count_Good")
-
-
-counts_bool_tidy[, Sample := factor(counts_bool_tidy$Sample, levels=sampleNames, ordered=TRUE)]
-all_tidy <- merge(all_tidy, counts_bool_tidy, by=c("bc_id", "Sample"))
-setorder(all_tidy, Sample)
-
-# rm(counts_bool_tidy)
-# rm(counts_bool)
-
-# Make selection variable for the proportions
-all_tidy[, prop_Top := Proportion > abund_thresh]
-
-# Make selection variables for treatment mouse and essay.
-all_tidy <- merge(all_tidy, samples_tidy, by.x="Sample", by.y="name")
-all_tidy[, Sample := factor(all_tidy$Sample, levels=sampleNames, ordered=TRUE)]
-setorder(all_tidy, Sample)
-# rm(samples_tidy)
-
-# all_tidy has the counts, don't need them here anymore. But keep it for the sequences.
-counts <- counts[, .(bc_id, barcode)]
-```
-
-```{r table}
-fwrite(merge(counts[,.(barcode, bc_id)],
-             dcast(all_tidy, bc_id ~ Sample, value.var = c("Reads", "Proportion")), on="bc_id"),
-       file=paste0(params$outpref, '_data.tsv'), sep="\t", quote=FALSE)
-```
-
 
 # Overview of the number of reads allocated per sample
 
-```{r, fig.height=6, fig.width=7}
+```{r demux, fig.height=6, fig.width=7}
 summaries[, total := sum(.SD$reads), by=file]
 summaries[, rate := reads / total]
 names(summaries)[1] <- "sample"
@@ -241,7 +183,7 @@ summaries <- summaries[reads > 0,]
 
 clr <- getPalette(length(unique(summaries$sample)))
 names(clr) <- unique(summaries$sample)
-clr[c("BCUnmatched", "EmptyVector")] <- c("black", "white")
+clr[c("BCUnmatched", "EmptyVector", "SampleUnknown")] <- c("black", "white", "grey50")
 
 pdemux <- ggplot(summaries) +
     geom_bar(aes(x=file, y=rate, fill=sample), stat="identity", position="stack", colour='black', size=0.25) +
@@ -255,24 +197,131 @@ ggplotly( pdemux, dynamicTicks = TRUE)
 
 # Number of reads and barcodes
 
-```{r}
-fwrite(dcast(count_summary[(Type != "top_Barcodes"), ], Sample ~ Type, value.var = 'Count'),
-       file=paste0(params$outpref, '_summary.tsv'), sep="\t", quote=FALSE)
+```{r bcthresh, fig.height=8, fig.width=10}
+# Distribution of barcodes by read-count.
+pbcdist1 <- ggplot(all_tidy, aes(x=Reads+0.01, colour=Sample, fill=Sample)) +
+	geom_density_ridges(aes(y=Sample), alpha=0.4) +
+	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
+	scale_x_log10() +
+	annotation_logticks(sides="b") +
+	scale_colour_manual(values=mycolours) +
+	scale_fill_manual(values=mycolours) +
+	labs(x='Reads', subtitle='including non-detected BCs') +
+	theme(panel.grid.minor=element_blank(),
+				legend.position='none')
+
+pbcdist2 <- ggplot(all_tidy[Reads > 0, ], aes(x=Reads, colour=Sample, fill=Sample)) +
+	geom_density_ridges(aes(y=Sample), alpha=0.4) +
+	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
+	scale_x_log10() +
+	annotation_logticks(sides="b") +
+	scale_colour_manual(values=mycolours) +
+	scale_fill_manual(values=mycolours) +
+	labs(x='Reads', subtitle='only detected BCs') +
+	theme(panel.grid.minor=element_blank(),
+				legend.position='none')
+
+print( pbcdist1 | pbcdist2 )
+
+# Effect of readcount threshold on number of barcodes.
+bcbythresh <- Reduce(rbind, lapply(c(1:9, seq(10, 10000, 10)), function(x){
+		dt <- all_tidy[Reads >= x, nrow(.SD), by=Sample]    # In long format, every row is one barcode in one sample
+		dt[, threshold := x]
+	}) )
+
+pbccount1 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
+	geom_line() +
+	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
+	scale_x_log10() +
+	annotation_logticks(sides="b") +
+	scale_colour_manual(values=mycolours) +
+	coord_cartesian(xlim=c(1, NA), ylim=c(1,NA)) +
+	labs(x='Read-count threshold', y='Barcodes') +
+	theme(panel.grid.minor=element_blank(),
+				legend.position="none")
+
+pbccount2 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
+	geom_line() +
+	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
+	scale_x_log10() +
+	scale_y_log10() +
+	annotation_logticks(sides="lb") +
+	scale_colour_manual(values=mycolours) +
+	coord_cartesian(xlim=c(1, NA), ylim=c(1,NA)) +
+	labs(x='Read-count threshold', y='Barcodes') +
+	theme(panel.grid.minor=element_blank())
+
+print( pbccount1 | pbccount2 )
+
+# Effect of proportion threshold on number of top barcodes.
+bcbythresh <- Reduce(rbind, lapply(c(seq(0, 1e-1, 1e-2), seq(0, 1e-2, 1e-3), seq(0, 1e-3, 1e-4), seq(0, 1e-4, 1e-5), seq(0, 1e-5, 1e-6)), function(x){
+		dt <- all_tidy[Proportion >= x, nrow(.SD), by=Sample]    # In long format, every row is one barcode in one sample
+		dt[, threshold := x]
+	}) )
+
+pbcpct1 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
+	geom_line() +
+	geom_vline(xintercept=params$abund_thresh, linetype='dotted') +
+	scale_y_log10() +
+	annotation_logticks(sides="l") +
+	coord_cartesian(ylim=c(1,NA)) +
+	scale_colour_manual(values=mycolours) +
+	labs(x='Proportion threshold', y='Top Barcodes') +
+	theme(panel.grid.minor=element_blank(),
+				legend.position='none')
+
+pbcpct2 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
+	geom_line() +
+	geom_vline(xintercept=params$abund_thresh, linetype='dotted') +
+	scale_y_log10() +
+	scale_x_log10() +
+	annotation_logticks(sides="bl") +
+	coord_cartesian(ylim=c(1,NA)) +
+	scale_colour_manual(values=mycolours) +
+	labs(x='Proportion threshold', y='Top Barcodes') +
+	theme(panel.grid.minor=element_blank())
+
+print( pbcpct1 | pbcpct2 )
 ```
 
-```{r counts, fig.height=6, fig.width=7}
+```{r categories}
+all_tidy[, count_Good := Reads >= count_thresh]
+all_tidy[, refcount_Good := FALSE]
+goodbc <- all_tidy[Sample %in% sampleNames[params$refsamps] & count_Good, bc_id]
+all_tidy[bc_id %in% goodbc, refcount_Good := TRUE]
+all_tidy[, prop_Top := Proportion >= abund_thresh]
+
+# Bring in the sample metadata
+all_tidy <- merge(all_tidy, samples_tidy, by="Sample")
+```
+
+```{r overview, fig.height=8, fig.width=10}
+# Make tidy summary of counts.
+count_summary <- Reduce(function(x, y){merge(x,y, by='Sample')},
+			list(all_tidy[, sum(Reads), by=Sample],
+					 all_tidy[Reads>0, .N, by=Sample],
+					 all_tidy[(count_Good), .N, by=Sample],
+					 all_tidy[(count_Good & prop_Top), .N, by=Sample]) )
+setnames(count_summary, c("Sample", "Reads", "BCs", "BCs_fltr", "BCs_top"))
+
 # Basic faceted barplot
-pcount <- ggplot(data=droplevels(count_summary[(Type != "top_Barcodes"), ]), aes(x=Sample, y=Count, fill=Type))  +
+pcount <- ggplot(data=melt(count_summary, id.vars=c("Sample"), value.name="Count", variable.name="Type"), 
+								 aes(x=Sample, y=Count, fill=Type))  +
             facet_grid(Type ~ ., scales = "free") +
             geom_bar(stat='identity', width=0.7, size=0.2) +
-            scale_fill_manual(values = c(all_BCs = "mediumorchid2",
-                                         fltr_BCs = "mediumorchid3",
+            scale_fill_manual(values = c(BCs_top = "mediumorchid1",
+            														 BCs_fltr = "mediumorchid3",
+            														 BCs = "mediumorchid4",
                                          Reads= "darkgoldenrod2")) +
-            scale_y_continuous(expand = expand_scale(mult = c(0, .15)), limits = c(0, NA)) +
+            scale_y_continuous(expand = expansion(mult = c(0, .15)), limits = c(0, NA)) +
             labs(title="Total # of reads, and # of detected barcodes", x='', y='') +
             gth + theme(legend.position = "none")
 
-ggplotly( pcount ) # , dynamicTicks = TRUE  cannot handle the categorical x axis.
+ggplotly( pcount ) # , dynamicTicks = TRUE  cannot handle the categorical x-axis.
+```
+
+```{r table}
+fwrite(count_summary, file=paste0(params$outpref, '_summary.tsv'), sep="\t", quote=FALSE)
 ```
 
 
@@ -281,10 +330,10 @@ ggplotly( pcount ) # , dynamicTicks = TRUE  cannot handle the categorical x axis
 Correlate the proportional abundances, using only the barcodes that are on average above the count threshold in the reference sample(s).
 
 ```{r, fig.height=7, fig.width=16}
-my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, method = "pearson", prefix=params$outpref, txs=4) {
+my_pairwise_internal_corels <- function(mat, samples = samples_tidy$Sample, method = "spearman", prefix=params$outpref, txs=4) {
   # Correlations
   cormat <- cor(mat, method=method)
-
+  
   # Cluster
   hcfit <- hclust(dist(scale(cormat, center=TRUE)))
   rn <- rownames(cormat)
@@ -292,7 +341,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
   cormat2 <- cormat                                     # Duplicate on which to delete the diagonal with original order.
   cormat3 <- cormat[rn[hcfit$order], rn[hcfit$order]]   # Duplicate in clustered order.
   cormat4 <- cormat3                                    # duplicate on which to delete the diagonal with in clustered order.
-
+  
   # Delete diagonal half for the numeric labels.
   for (r in 1:nrow(cormat2)) {
     for (c in 1:ncol(cormat2)) {
@@ -308,40 +357,40 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
       }
     }
   }
-
+  
   # Restructure for plotting.
   rn <- rownames(cormat)
   cormat <- as.data.table(cormat)
   cormat[, observation1 := factor(rn, ordered=TRUE, levels=rn)]
   cormat <- melt(cormat, id.vars = "observation1", value.name = "Correlation", variable.name = "observation2")
   cormat[, observation2 := factor(observation2, ordered=TRUE, levels=rn)]
-
+  
   rn2 <- rownames(cormat2)
   cormat2 <- as.data.table(cormat2)
   cormat2[, observation1 := factor(rn2, ordered=TRUE, levels=rn2)]
   cormat2 <- melt(cormat2, id.vars = "observation1", value.name = "Correlation", variable.name = "observation2")
   cormat2[, observation2 := factor(observation2, ordered=TRUE, levels=rn2)]
   cormat2 <- cormat2[!is.na(Correlation)]
-
+  
   rn3 <- rownames(cormat3)
   cormat3 <- as.data.table(cormat3)
   cormat3[, observation1 := factor(rn3, ordered=TRUE, levels=rn3)]
   cormat3 <- melt(cormat3, id.vars = "observation1", value.name = "Correlation", variable.name = "observation2")
   cormat3[, observation2 := factor(observation2, ordered=TRUE, levels=rn3)]
-
+  
   rn4 <- rownames(cormat4)
   cormat4 <- as.data.table(cormat4)
   cormat4[, observation1 := factor(rn3, ordered=TRUE, levels=rn4)]
   cormat4 <- melt(cormat4, id.vars = "observation1", value.name = "Correlation", variable.name = "observation2")
   cormat4[, observation2 := factor(observation2, ordered=TRUE, levels=rn4)]
   cormat4 <- cormat4[!is.na(Correlation)]
-
+  
   # Text colour switch for the dynamic range
   m <- min(cormat4$Correlation, na.rm=TRUE)
   M <- max(cormat4$Correlation, na.rm=TRUE)
   colourswitch <- c( m + 0.49 * (M-m),  m + 0.51 * (M-m) )
-
-
+  
+  
   # Square. Custom order. No values. Full range.
   p1 <- ggplot(cormat, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -350,7 +399,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Square. Custom order. No values. Dynamic range.
   p1a <- ggplot(cormat, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -359,7 +408,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Triangle. Custom order. With values. Full range.
   p2 <- ggplot(cormat2, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -370,7 +419,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Triangle. Custom order. With values. Dynamic range.
   p2a <- ggplot(cormat2, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -381,7 +430,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Square. Custom order. With values. Full range.
   p12 <- ggplot(cormat, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -392,7 +441,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Square. Custom order. With values. Dyhamic range.
   p12a <- ggplot(cormat, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -403,8 +452,8 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
-
+  
+  
   # Square. Clustered order. No values. Full range.
   p3 <- ggplot(cormat3, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -413,7 +462,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Square. Clustered order. No values. Dyhamic range.
   p3a <- ggplot(cormat3, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -422,7 +471,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Triangle. Clustered order. with values. Full range.
   p4 <- ggplot(cormat4, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -433,7 +482,7 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Triangle. Clustered order. with values. Dyhamic range.
   p4a <- ggplot(cormat4, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
@@ -444,38 +493,38 @@ my_pairwise_internal_corels <- function(mat = rpm, samples = samples_tidy$name, 
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Square. Clustered order. With values. Full range.
   p34 <- ggplot(cormat3, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
     geom_text(data=cormat4, aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=Correlation >= -0.60 & Correlation <= 0.60 ), size=rel(txs)) +
-  	scale_fill_gradientn(limits=c(-1, 1), colors=c("lightskyblue", "dodgerblue3", "darkblue", "black", "darkred", "red", "gold"), na.value = "forestgreen" ) +
+    scale_fill_gradientn(limits=c(-1, 1), colors=c("lightskyblue", "dodgerblue3", "darkblue", "black", "darkred", "red", "gold"), na.value = "forestgreen" ) +
     scale_colour_manual(values=c('FALSE'="black", 'TRUE'="white"), na.value="forestgreen", guide="none") +
     scale_x_discrete(position = "top") +
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   # Square. Clustered order. With values. Dyhamic range.
   p34a <- ggplot(cormat3, aes(x=observation1, y=observation2)) +
     geom_tile(aes(fill=Correlation)) +
     geom_text(data=cormat4, aes(label=sub('0.', '.', as.character(round(Correlation, 2))), colour=(Correlation <= colourswitch[2]) ), size=rel(txs)) +
-  	scale_fill_gradientn(colors=c("black", "red", "gold", "white"), na.value = "forestgreen" ) +
+    scale_fill_gradientn(colors=c("black", "red", "gold", "white"), na.value = "forestgreen" ) +
     scale_colour_manual(values=c("black", "white"), na.value="transparent", guide="none") +
     scale_x_discrete(position = "top") +
     labs(x='', y='', title=paste(paste(toupper(substr(method, 1, 1)), tolower(substr(method, 2, nchar(method))), "'s", sep=""), "correlation - Clustered")) +
     theme(axis.text.x=element_text(angle=90, hjust=0, vjust=0.5),
           panel.grid = element_blank() )
-
+  
   fwrite(dcast(cormat2, observation1 ~ observation2, value.var = "Correlation"),
          file=paste0(prefix, '_cor.txt'),
          sep='\t', quote = FALSE, row.names = FALSE, col.names = TRUE)
-
-
+  
+  
   return( list(sfrnc=p1, tfrnc=p2, frnc=p12,
-  						 sdrnc=p1a, tdrnc=p2a, drnc=p12a,
-  						 sfrc=p3, tfrc=p4, frc=p34,
-  						 sdrc=p3a, tdrc=p4a, drc=p34a) )
+               sdrnc=p1a, tdrnc=p2a, drnc=p12a,
+               sfrc=p3, tfrc=p4, frc=p34,
+               sdrc=p3a, tdrc=p4a, drc=p34a) )
 }
 
 
@@ -486,16 +535,16 @@ cplots <- my_pairwise_internal_corels(mat = cf[,2:length(cf)], method='spearman'
 print( cplots[["drnc"]] + cplots[["frc"]] )
 ```
 
-# Distribution of barcode abundances above threshold
+# Distribution of barcode abundances
 
-Mind that the Y-axis scale is **logarithmic**, meaning the distributions are much more top-skewed than they appear.
+Only barcodes that passed the read-count filter are shown.
 
 ```{r proportions}
 # ALSO EDIT: If this plot is changed, the same plot in the PDF chunk at the end of the report should be updated to match!
 pviol <- all_tidy %>%
     filter(count_Good) %>%
     ggplot(aes(x=Sample, y=Proportion)) +
-      geom_violin(aes(fill=treatment), width=1) +
+      geom_violin(aes(fill=Treatment), width=1) +
       geom_boxplot(fill="white", width=0.1, outlier.colour = 'transparent') +
       geom_hline(yintercept = abund_thresh, linetype='dotted') +
       scale_y_log10() +
@@ -509,54 +558,104 @@ print ( pviol )
 
 # Barcode Complexity
 
+Number of barcodes passing the counts threshold (X-axis) vs. number of barcodes passing the proportion threshold (Y-axis).
+
+```{r complexity_plot}
+# The labels can create terrible clutter if the plot is small with lots of points.
+# Plotly enables hover-over to get Sample info
+
+pcomplex2 <- ggplot(data=all_tidy %>% filter(count_Good) %>% group_by(Sample) %>% summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(Treatment)),
+         aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, colour=Treatment)) +
+    geom_point(shape=16, alpha=0.6) +
+    scale_colour_manual(values=treatCols) +
+    ggtitle("Barcode Diversity") +
+    gth
+
+ggplotly( pcomplex2, dynamicTicks = TRUE )
+```
+
+
 ```{r complexity}
 # Identify shared top barcodes
-sharedBarcodes <- all_tidy %>%
-  filter(prop_Top) %>%
-  group_by(bc_id) %>%
-  summarise(numSamples=n()) %>%
-  filter(numSamples > 1)
+sharedBarcodes <- all_tidy[(prop_Top), .N, by=bc_id][N>1, ]
+sharedBarcodesGrp <- all_tidy[(prop_Top), .N, by=c("Group", "bc_id")][N>1, ]
+sharedBarcodesTrt <- all_tidy[(prop_Top), .N, by=c("Treatment", "bc_id")][N>1, ]
+setorder(sharedBarcodes, -N)
+setorder(sharedBarcodesGrp, -N)
+setorder(sharedBarcodesTrt, -N)
+
+sharedBarcodes <- Reduce(rbind,
+			 apply(sharedBarcodes, 1, function(x){
+			 	all_tidy[prop_Top & bc_id==x['bc_id'], paste(Sample, collapse = " ; "), by=bc_id]
+			 	})
+)
+setnames(sharedBarcodes, c("bc_id", "Samples"))
+
+sharedBarcodesGrp <- Reduce(rbind,
+			 apply(sharedBarcodesGrp, 1, function(x){
+			 	all_tidy[prop_Top & bc_id==x['bc_id'] & Group==x['Group'], paste(Sample, collapse = " ; "), by=c("Group", "bc_id")]
+			 	})
+)
+setnames(sharedBarcodesGrp, c("group", "bc_id", "Samples"))
+sharedBarcodesGrp <- sharedBarcodesGrp[! bc_id %in% sharedBarcodesGrp[duplicated(bc_id), bc_id], ]  # duplicated barcodes are not unique to the group.
+
+sharedBarcodesTrt <- Reduce(rbind,
+			 apply(sharedBarcodesTrt, 1, function(x){
+			 	all_tidy[prop_Top & bc_id==x['bc_id'] & Treatment==x['Treatment'], paste(Sample, collapse = " ; "), by=c("Treatment", "bc_id")]
+			 	})
+)
+setnames(sharedBarcodesTrt, c("treatment", "bc_id", "Samples"))
+sharedBarcodesTrt <- sharedBarcodesTrt[! bc_id %in% sharedBarcodesTrt[duplicated(bc_id), bc_id], ]  # duplicated barcodes are not unique to the treatment.
+
 
 # Create selection variable for shared top-ness.
 all_tidy[, is_Shared := bc_id %in% sharedBarcodes$bc_id]
+all_tidy[, is_SharedGrp := bc_id %in% sharedBarcodesGrp$bc_id]
+all_tidy[, is_SharedTrt := bc_id %in% sharedBarcodesTrt$bc_id]
 ```
 
-Top barcodes that are shared among at least 2 samples.
 
-```{r complexity2}
-print( as.data.table(all_tidy %>%
-         filter(is_Shared, prop_Top) %>%
-         group_by(bc_id) %>%
-         summarise(Samples = paste(Sample, collapse = " ; ")))
-)
+The colours in the bargraphs below identify enriched barcodes shared across samples. Grey means the barcode is not shared. The barcodes that are below the proportion threshold are represented by the uncoloured top compartment in each stack.
+
+The number of colours that can be distinguished easily by eye is limited, which can be a problem when a large number of barcodes are identified here. If you are unsure whether two colours are the same, hover the mouse pointer over them to verify they have the same `bc_id` value.
+
+## Top barcodes shared across any samples
+
+enriched in any two or more samples, regardless of group assignment.
+
+```{r complexity2a}
+print( sharedBarcodes )
 ```
 
-The colours identify shared barcodes across samples. Grey means the barcode is not shared.
-The barcodes that are below the threshold are represent by the uncoloured top compartment in each stack.
-
-```{r complexity_plots2, fig.height=6}
+```{r complexity_plots2a, fig.widht=7, fig.height=10}
 # Prepare colour fill.
 all_tidy[, sharedFill := as.character(ifelse(bc_id %in% sharedBarcodes$bc_id, bc_id, 'notshared'))]
-
-# Numbers of Barcodes
-secScale <- max(numBarcodesThresh) / max(numBarcodes)
-count_summary[, scaledCount := Count / secScale]
 
 # Filter data, then add dummy entries for any samples that have no qualifying barcodes, so they are still shown on the axis.
 # Also fill-in a bulk segment for the barcodes that did not meet the threshold.
 tmp <- as.data.table(all_tidy %>%
-  filter(prop_Top) %>%
-  arrange(desc(Proportion)))
+										 	filter(prop_Top) %>%
+										 	arrange(desc(Proportion)))
 dropped <- unique(all_tidy$Sample)[! unique(all_tidy$Sample) %in% unique(tmp$Sample)]
 if(length(dropped) > 0)
-  tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=0, refcount_Good=0, Reads=0, Proportion=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill=NA) )
+  tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=NA_character_, Reads=0, Proportion=0, count_Good=NA, refcount_Good=NA,
+  														 prop_Top=FALSE, Tag=NA_character_, Group=NA_character_, Treatment=NA_character_,
+  														 is_Shared=NA, is_SharedGrp=NA, is_SharedTrt=NA, sharedFill=NA_integer_) )
 fillup <- tmp[, .(Sample, Proportion)] [, 1-sum(Proportion), by=Sample]
 setnames(fillup, c("Sample", "Proportion"))
-tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=0, refcount_Good=0, Reads=0, count_Good=NA, prop_Top=FALSE, treatment=NA, is_Shared=NA, sharedFill='fillup')) )
+tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=NA_character_, Reads=0, count_Good=NA,refcount_Good=NA, prop_Top=FALSE,
+																					 Tag=NA_character_, Group=NA_character_, Treatment=NA_character_,
+																					 is_Shared=NA, is_SharedGrp=NA, is_SharedTrt=NA, sharedFill='fillup')) )
 
 # Assign colours
 elem <- as.character(unique(tmp$sharedFill[!is.na(tmp$sharedFill) & ! tmp$sharedFill %in% c('notshared', 'fillup')]))
-elemcol <- getPalette(length(elem))
+if (length(elem) > length(mycolours)){
+	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
+	elemcol <- getPalette(length(elem))
+} else {
+	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
+	elemcol <- mycolours[1:length(elem)]
+}
 names(elemcol) <- elem
 elemcol["notshared"] <- "grey70"
 elemcol["fillup"] <- "grey95"
@@ -568,39 +667,172 @@ pcomplex <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFill, group=
          scale_fill_manual(values=elemcol) +
          ylab("Individual barcode proportion") +
          labs(title=paste0("Barcodes with at least ", abund_thresh * 100,"% representation"), x='') +
-         gth + theme(panel.grid.major.x = element_blank(), legend.position="none")
+         gth + theme(panel.grid.major.x = element_blank(), 
+         						legend.position="none")
 
 ggplotly( pcomplex, dynamicTicks = TRUE )
 ```
 
-Number of barcodes passing the counts threshold vs. number of barcodes passing the representation threshold.
+## Top barcodes shared within sample groups
 
-```{r complexity_plots3}
-# The labels can create terrible clutter if the plot is small with lots of points.
-# Plotly enables hover-over to get Sample info
+Enriched in any two or more samples within each of the designated groups.
 
-pcomplex2 <- ggplot(data=all_tidy %>% filter(count_Good) %>% group_by(Sample) %>% summarise(n_Barcodes=n(), n_TopBarcodes=sum(prop_Top), Treatment=unique(treatment)),
-         aes(label=Sample, x=n_Barcodes, y=n_TopBarcodes, colour=Treatment)) +
-    geom_point(shape=16, alpha=0.6) +
-    scale_colour_manual(values=treatCols) +
-    ggtitle("Barcode Diversity") +
-    gth
+```{r complexity2b}
+print( sharedBarcodesGrp )
+```
 
-ggplotly( pcomplex2, dynamicTicks = TRUE )
+```{r complexity_plots2b, fig.widht=7, fig.height=10}
+# Prepare colour fill.
+all_tidy[, sharedFillGrp := as.character(ifelse(bc_id %in% sharedBarcodesGrp$bc_id, bc_id, 'notshared'))]
+
+# Filter data, then add dummy entries for any samples that have no qualifying barcodes, so they are still shown on the axis.
+# Also fill-in a bulk segment for the barcodes that did not meet the threshold.
+tmp <- as.data.table(all_tidy %>%
+										 	filter(prop_Top) %>%
+										 	arrange(desc(Proportion)))
+dropped <- unique(all_tidy$Sample)[! unique(all_tidy$Sample) %in% unique(tmp$Sample)]
+if(length(dropped) > 0)
+  tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=0, Reads=0, Proportion=0, count_Good=NA, refcount_Good=NA,
+  														 prop_Top=FALSE, Tag=NA_character_, Group=NA_character_, Treatment=NA_character_,
+  														 is_Shared=NA, is_SharedGrp=NA, is_SharedTrt=NA, sharedFill=NA_integer_, sharedFillGrp=NA_integer_) )
+fillup <- tmp[, .(Sample, Proportion)] [, 1-sum(Proportion), by=Sample]
+setnames(fillup, c("Sample", "Proportion"))
+tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=-Inf, Reads=0, count_Good=NA,refcount_Good=NA, prop_Top=FALSE,
+																					 Tag=NA_character_, Group=NA_character_, Treatment=NA_character_,
+																					 is_Shared=NA, is_SharedGrp=NA, is_SharedTrt=NA, sharedFill=NA_character_, 
+																					 sharedFillGrp='fillup')) )
+
+# Assign colours
+elem <- as.character(unique(tmp$sharedFillGrp[!is.na(tmp$sharedFillGrp) & ! tmp$sharedFillGrp %in% c('notshared', 'fillup')]))
+if (length(elem) > length(mycolours)){
+	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
+	elemcol <- getPalette(length(elem))
+} else {
+	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
+	elemcol <- mycolours[1:length(elem)]
+}
+names(elemcol) <- elem
+elemcol["notshared"] <- "grey70"
+elemcol["fillup"] <- "grey95"
+
+pcomplexGrp <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFillGrp, group="A", label=bc_id)) +
+         geom_bar(stat='identity', position=position_stack(), colour="black", width=0.9, size=0.2) +
+         scale_y_continuous(expand = c(0, 0), limits= c(0,1),
+                            sec.axis = sec_axis(trans = ~ .)) +
+         scale_fill_manual(values=elemcol) +
+         ylab("Individual barcode proportion") +
+         labs(title=paste0("Barcodes with at least ", abund_thresh * 100,"% representation"), x='') +
+         gth + theme(panel.grid.major.x = element_blank(), 
+         						legend.position="none")
+
+ggplotly( pcomplexGrp, dynamicTicks = TRUE )
+```
+
+## Top barcodes shared within treatments
+
+Enriched in any two or more samples within each of the treatments.
+
+```{r complexity2c}
+print( sharedBarcodesTrt )
+```
+
+```{r complexity_plots2c, fig.widht=7, fig.height=10}
+# Prepare colour fill.
+all_tidy[, sharedFillTrt := as.character(ifelse(bc_id %in% sharedBarcodesTrt$bc_id, bc_id, 'notshared'))]
+
+# Filter data, then add dummy entries for any samples that have no qualifying barcodes, so they are still shown on the axis.
+# Also fill-in a bulk segment for the barcodes that did not meet the threshold.
+tmp <- as.data.table(all_tidy %>%
+										 	filter(prop_Top) %>%
+										 	arrange(desc(Proportion)))
+dropped <- unique(all_tidy$Sample)[! unique(all_tidy$Sample) %in% unique(tmp$Sample)]
+if(length(dropped) > 0)
+  tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=0, Reads=0, Proportion=0, count_Good=NA, refcount_Good=NA,
+  														 prop_Top=FALSE, Tag=NA_character_, Group=NA_character_, Treatment=NA_character_,
+  														 is_Shared=NA, is_SharedGrp=NA, is_SharedTrt=NA, sharedFill=NA_integer_, 
+  														 sharedFillGrp=NA_integer_, sharedFillTrt=NA_integer_) )
+fillup <- tmp[, .(Sample, Proportion)] [, 1-sum(Proportion), by=Sample]
+setnames(fillup, c("Sample", "Proportion"))
+tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=-Inf, Reads=0, count_Good=NA,refcount_Good=NA, prop_Top=FALSE,
+																					 Tag=NA_character_, Group=NA_character_, Treatment=NA_character_,
+																					 is_Shared=NA, is_SharedGrp=NA, is_SharedTrt=NA, sharedFill=NA_character_,
+																					 sharedFillGrp=NA_integer_, sharedFillTrt='fillup')) )
+
+# Assign colours
+elem <- as.character(unique(tmp$sharedFillTrt[!is.na(tmp$sharedFillTrt) & ! tmp$sharedFillTrt %in% c('notshared', 'fillup')]))
+if (length(elem) > length(mycolours)){
+	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
+	elemcol <- getPalette(length(elem))
+} else {
+	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
+	elemcol <- mycolours[1:length(elem)]
+}
+names(elemcol) <- elem
+elemcol["notshared"] <- "grey70"
+elemcol["fillup"] <- "grey95"
+
+pcomplexTrt <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFillTrt, group="A", label=bc_id)) +
+         geom_bar(stat='identity', position=position_stack(), colour="black", width=0.9, size=0.2) +
+         scale_y_continuous(expand = c(0, 0), limits= c(0,1),
+                            sec.axis = sec_axis(trans = ~ .)) +
+         scale_fill_manual(values=elemcol) +
+         ylab("Individual barcode proportion") +
+         labs(title=paste0("Barcodes with at least ", abund_thresh * 100,"% representation"), x='') +
+         gth + theme(panel.grid.major.x = element_blank(), 
+         						legend.position="none")
+
+ggplotly( pcomplexGrp, dynamicTicks = TRUE )
+```
+
+## Interesting barcodes
+
+"Interesting-ness" is loosely based on a barcode meeting the abundance thresholds and on how many samples have that barcode enriched in common. This score is meant to help in identifying recurring enriched barcodes, but it is not intended as a definitive criterion, In additino, the values are not comparable across analyses of different samples.
+
+```{r table2}
+# Collect flags to put in wide format
+DF <- all_tidy[, 
+							 .(cnt = sum(count_Good), 
+								 pct = sum(prop_Top), 
+								 sh = sum(is_Shared), 
+								 shg = sum(is_SharedGrp), 
+								 sht = sum(is_SharedTrt)) , 
+							 by=c("bc_id", "Group", "Treatment")]
+DF[, interesting := rowSums(DF[, c(4:5, 7:8), with=FALSE])]  # is_Shared mixes all samples, treated and untreated. Barcodes there are probably the opposite of interesting.
+
+all_tidy <- merge(all_tidy, DF[, list(interesting = sum(interesting)), by=bc_id], by="bc_id")
+
+
+# Spread abundances to wide format
+DF <- dcast(all_tidy, bc_id + interesting ~ Sample, value.var=c("Reads", "Proportion"))
+DF <- merge(counts[, .(bc_id, barcode)], DF, by="bc_id")
+setorder(DF, -interesting)
+
+
+fwrite(DF, file=paste0(params$outpref, '_data.tsv'), sep="\t", quote=FALSE)
+
+
+tmp <- DF[, .N, by=interesting]
+tmp[, cs := cumsum(N)]
+print( DF[ interesting >= tail(tmp[N<10, interesting], 1), .(bc_id, barcode, interesting)] )
+
+interestingbcs <- DF[ interesting >= tail(tmp[N<10, interesting], 1), bc_id]
+
+p1 <-	ggplot(DF, aes(x=interesting)) +
+		geom_histogram(bins=max(DF$interesting, na.rm=TRUE)) +
+		labs(y="Barcodes") +
+		theme_light()
+
+ggplotly(p1, dynamicTicks=TRUE)
 ```
 
 # Enrichment of barcodes
 
-## Expression heatmap of top barcodes.
+## Expression heatmap of interesting barcodes.
 
-All barcodes above the proportion threshold.
+All the barcodes that meet the proportion threshold in at least one sample.
 
 ```{r enrichment, fig.height=15}
-top <- all_tidy %>%
-  filter(prop_Top) %>%
-  select(bc_id) %>%
-  arrange(bc_id) %>%
-  unique()
+top <- unique(all_tidy[(prop_Top), .(bc_id)])
 
 pheat <- all_tidy %>%
   arrange(bc_id) %>%
@@ -611,29 +843,26 @@ pheat <- all_tidy %>%
     geom_tile(colour='transparent') +
     labs(x='') +
     theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
-          legend.position = "right",
           panel.background = element_rect(fill="white"),
           panel.grid.major = element_line(colour="grey95"))
 
 ggplotly( pheat, dynamicTicks = TRUE )
 ```
 
-## Distribution of top shared barcodes
+## Distribution of top interesting barcodes
 
-This section identifies the abundance of each selected barcode (white diamonds) against the distribution of all barcodes (violin/boxplots).
-
-Mind that the Y-axis scale is **logarithmic**. Outliers at the top are much farther away from the main bulk of the distribution than they appear.
+This section identifies the abundance of each selected barcode (white diamonds and white violin/box-plot) against the distribution of all barcodes (coloured violin/box-plots).
 
 ```{r enrichment_shared}
-pviolas <- lapply(sharedBarcodes$bc_id, function(bc) {
-  # bc <- sharedBarcodes$bc_id[1]
+pviolas <- lapply(interestingbcs, function(bc) {
+  # bc <- interestingbcs[1]
 
   # Create dummy sample with the abundances of the given barcode only.
   # Preserve sample order.
   tmp <- all_tidy[(bc_id==bc),]
   bct <- paste("bc:", bc)
   tmp$Sample <- factor(bct, levels=c(sampleNames, bct), ordered=TRUE)
-  tmp$treatment <- "bc"
+  tmp$Treatment <- "bc"
   tmp2 <- all_tidy[(count_Good),]
   tmp2$Sample <- factor(tmp2$Sample, levels=c(sampleNames, bct), ordered=TRUE)
   tmp <- rbind(tmp2, tmp)
@@ -641,7 +870,7 @@ pviolas <- lapply(sharedBarcodes$bc_id, function(bc) {
   print(paste('Barcode', bc))
   print(counts$barcode[counts$bc_id==bc])
   
-  p <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=treatment)) +
+  p <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=Treatment)) +
       geom_hline(yintercept=abund_thresh, linetype='dotted') +
       geom_violin() +
       geom_boxplot(fill='white', width=0.15, outlier.size = 0.8, outlier.alpha = 0.5, alpha=0.4) +
@@ -659,8 +888,6 @@ pviolas <- lapply(sharedBarcodes$bc_id, function(bc) {
 ```
 
 ## Distribution of manually selected barcodes
-
-Mind that the Y-axis scale is **logarithmic**. Outliers at the top are much farther away from the main bulk of the distribution than they appear.
 
 ```{r enrichment_manual}
 pviolas2 <- NULL
@@ -748,39 +975,39 @@ sessionInfo()
 
 
 ```{r pdf}
-if (topdf){
-  pdf(paste0(params$outpref, '_report.pdf'), paper="a4", width=7, height=10)
+pdf(paste0(params$outpref, '_report.pdf'), paper="a4", width=7, height=10)
 
-	print ( pdemux )
-	print ( pcount )
-	print ( pcount + scale_y_continuous(expand = expand_scale(mult = c(0, .15)), limits = c(0, NA), trans='sqrt') )
-	print( cplots[["drnc"]] )
-	print( cplots[["frc"]] )
-	# print ( pviol )      # For some reason pviol breaks between point of its creation and here. So just reimplement it below.
-	print( all_tidy %>%
-    filter(count_Good) %>%
-    ggplot(aes(x=Sample, y=Proportion)) +
-      geom_violin(aes(fill=treatment), width=1) +
-      geom_boxplot(fill="white", width=0.1, outlier.colour="transparent") +
-      geom_hline(yintercept = abund_thresh, linetype='dotted') +
-      scale_y_log10() +
-			annotation_logticks(base=10, sides='lr') +
-      scale_fill_manual(values=treatCols) +
-      labs(title="Barcode abundances", subtitle=paste("for barcodes with at least", count_thresh, "reads"), x='') +
-  		gth
-	)
-	print ( pcomplex )
-	print ( pcomplex2 + geom_label_repel(nudge_x=100, min.segment.length = 0))
-	print ( pheat )
-	print(pviolas)
-	if (!is.null(pviolas2)) {
-		print(pviolas2)
-	}
-	if (!is.null(params$hammdist)) {
-		print( pham1 )
-	  print( pham2 / pham3 )
-	}
-	
-  dev.off()
+print ( pdemux )
+print ( pcount )
+print ( pcount + scale_y_continuous(expand = expand_scale(mult = c(0, .15)), limits = c(0, NA), trans='sqrt') )
+print( cplots[["drnc"]] )
+print( cplots[["frc"]] )
+# print ( pviol )      # For some reason pviol breaks between point of its creation and here. So just reimplement it below.
+print( all_tidy %>%
+  filter(count_Good) %>%
+  ggplot(aes(x=Sample, y=Proportion)) +
+    geom_violin(aes(fill=Treatment), width=1) +
+    geom_boxplot(fill="white", width=0.1, outlier.colour="transparent") +
+    geom_hline(yintercept = abund_thresh, linetype='dotted') +
+    scale_y_log10() +
+		annotation_logticks(base=10, sides='lr') +
+    scale_fill_manual(values=treatCols) +
+    labs(title="Barcode abundances", subtitle=paste("for barcodes with at least", count_thresh, "reads"), x='') +
+		gth
+)
+print ( pcomplex )
+print ( pcomplexGrp )
+print ( pcomplexTrt )
+print ( pcomplex2 + geom_label_repel(nudge_x=100, min.segment.length = 0))
+print ( pheat )
+print(pviolas)
+if (!is.null(pviolas2)) {
+	print(pviolas2)
 }
+if (!is.null(params$hammdist)) {
+	print( pham1 )
+  print( pham2 / pham3 )
+}
+
+dev.off()
 ```
