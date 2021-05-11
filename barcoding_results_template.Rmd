@@ -206,7 +206,8 @@ pbcdist1 <- ggplot(all_tidy, aes(x=Reads+0.01, colour=Sample, fill=Sample)) +
 	annotation_logticks(sides="b") +
 	scale_colour_manual(values=mycolours) +
 	scale_fill_manual(values=mycolours) +
-	labs(x='Reads', subtitle='including non-detected BCs') +
+	labs(x='Reads', title="Barcode coverage", subtitle='including non-detected BCs') +
+	theme_classic() +
 	theme(panel.grid.minor=element_blank(),
 				legend.position='none')
 
@@ -218,6 +219,7 @@ pbcdist2 <- ggplot(all_tidy[Reads > 0, ], aes(x=Reads, colour=Sample, fill=Sampl
 	scale_colour_manual(values=mycolours) +
 	scale_fill_manual(values=mycolours) +
 	labs(x='Reads', subtitle='only detected BCs') +
+	theme_classic() +
 	theme(panel.grid.minor=element_blank(),
 				legend.position='none')
 
@@ -532,7 +534,7 @@ cf <- dcast(all_tidy[(refcount_Good), ], bc_id ~ Sample, value.var='Proportion',
 cat(paste('Number of barcodes used:', nrow(cf)))
 
 cplots <- my_pairwise_internal_corels(mat = cf[,2:length(cf)], method='spearman', prefix=paste0(params$outpref, '_spearman'))
-print( cplots[["drnc"]] + cplots[["frc"]] )
+print( cplots[["frnc"]] + cplots[["drc"]] )
 ```
 
 # Distribution of barcode abundances
@@ -621,7 +623,7 @@ The number of colours that can be distinguished easily by eye is limited, which 
 
 ## Top barcodes shared across any samples
 
-enriched in any two or more samples, regardless of group assignment.
+Enriched in any two or more samples, regardless of group assignment.
 
 ```{r complexity2a}
 print( sharedBarcodes )
@@ -784,9 +786,9 @@ pcomplexTrt <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFillTrt, 
 ggplotly( pcomplexGrp, dynamicTicks = TRUE )
 ```
 
-## Interesting barcodes
+# Interesting barcodes
 
-"Interesting-ness" is loosely based on a barcode meeting the abundance thresholds and on how many samples have that barcode enriched in common. This score is meant to help in identifying recurring enriched barcodes, but it is not intended as a definitive criterion, In additino, the values are not comparable across analyses of different samples.
+"Interesting-ness" is loosely based on a barcode meeting the abundance thresholds and on how many samples have that barcode enriched in common. This score is meant to help in identifying recurring enriched barcodes, but it is not intended as a definitive criterion, In addition, the values are not comparable across analyses of different samples. The cutoff for interesting-ness is rather arbitrary and based on the number of barcodes that achieve each score: The cutoff is set at the highest score value that is achieved by 10 or more different barcodes.
 
 ```{r table2}
 # Collect flags to put in wide format
