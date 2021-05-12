@@ -22,17 +22,17 @@ usage = "Barcoding"
 parser = ArgumentParser(description=usage, formatter_class=RawDescriptionHelpFormatter)
 
 parser.add_argument("-f", "--file", type=str, required=True, dest="bamFile", help="A single BAM file.")
-parser.add_argument("-b", "--barcodes", type=str, required=False, dest="barcodesFile", help="Table of demultiplex sample tags. Mixed lengths allowed, as long as they don't overlap. Tab delimited: Tag, Sample, with header line (additional Group, Treatment and Colour fields are tolerated, for convenience). Omit this parameter completely if BAM contains a single sample.")
+parser.add_argument("-b", "--barcodesFile", type=str, required=False, help="Optional tab-delimited demultiplexing table.")
 parser.add_argument('-o', "--outdir", type=str, required=False, default="./process", help="Output directory (./process/).")
 
-parser.add_argument('-r', "--revcomp", action='store_true', help="Reverse complement the sample tags provided for demultiplexing (False).")
-parser.add_argument('--bc_len', type=int, default=67, help="Length of the barcode (67).")
-parser.add_argument('--gt_len', type=int, default=20, help="Number of bases between barcode start and sample tag end (20), used to demultiplex samples. In the Umkehrer/Obenauf design this corresponds to the genotype tag length. Negative values could conceivably work too, to specify a sample tag location after the barcode (not tested)...")
+parser.add_argument('-r', "--revcomp", action='store_true', help="Reverse complement the sample tags (False).")
+parser.add_argument('--bc_len', type=int, default=68, help="Length of the barcode (68).")
+parser.add_argument('--gt_len', type=int, default=20, help="Number of bases between the end of the sample tag and the start of the barcode (20).")
 
 parser.add_argument('-i', "--spikein", action='store_true', help="Also match the hard-coded spike-in barcode pattern.")
-parser.add_argument('-s', "--stringent", action='store_true', help="Use the hard-coded long Umkeherer/Obenauf barcode pattern instead of the short one (False)")
+parser.add_argument('-s', "--stringent", action='store_true', help="Use the hard-coded long barcode pattern instead of the short one (False).")
 parser.add_argument('--n_dark', type=int, default=0, help="Number of dark bases to allow in the barcode (0). For this to work, the barcode pattern must include N's for all the positions that are allowed to be dark.")
-parser.add_argument("--pattern", type=str, required=False, help="Custom regex string. Undefined will default to the hard-coded original Umkehrer/Obenauf design.")
+parser.add_argument("--pattern", type=str, required=False, help="Optional custom regex string to override the hard-coded design. It must include the start of the barcode.")
 
 args = parser.parse_args()
 
@@ -74,10 +74,10 @@ else:
 ##############
 
 # Christian's design:
-#     P7adapter_template_BARCODE_GenotypeTag_SampleINDEX_NNNNNN_P5adapter       <--- read direction. Sample Index is contained in the read and can be used to demultiplex.
+#     P7adapter_template_BARCODE_GenotypeTag_SampleINDEX_NNNNNN_P5adapter       <--- read direction. Sample index is contained in the read and can be used to demultiplex.
 # Shona's design:
-#     P7adapter_SampleIndex_template_BARCODE_GenotypeTag_P5adapter              <--- read direction, unlikely to contain the SampleIndex,
-#                                                                                    reads must demultiplexed by sequencing facility using the mate read.
+#     P7adapter_SampleIndex_template_BARCODE_GenotypeTag_P5adapter              <--- read direction, unlikely to contain the Sample index,
+#                                                                                    reads must be demultiplexed in advance using the mate read.
 
 #    20nt                |short end       short start|               19nt
 # <--GBNSNNNVDNVNVWVMWNNRCGGCGBNSNNNNDNGGCWVMWNNRCGGCGBNSNNNVDNVNVWVMWNNR--<      <- sequencing direction <-
@@ -89,7 +89,7 @@ else:
 # Umkehrer/Obenauf barcode pattern
 bc_pattern_full = re.compile('[TC]{1}[ATGC]{2}[AT]{1}[TG]{1}[TGC]{1}[AT]{1}[TGC]{1}[ATGC]{1}[TGC]{1}[ATGC]{1}[ATC]{1}[TGC]{1}[ATGC]{3}[CG]{1}[ATGC]{1}[CGA]{1}CGCCG[TC]{1}[AGTC]{2}[AT]{1}[TG]{1}[TCG]{1}[AT]{1}GCC[ATGC]{1}[ACT]{1}[ATGC]{4}[GC]{1}[AGTC]{1}[CGA]{1}CGCCG')
 bc_pattern_short = re.compile('CGCCG[ATGC]{7}GCC[ATGC]{9}CGCCG')
-bc_pattern_dark = re.compile('[CN][GN][CN][CN][GN][ATGCN]{7}[GN][CN][CN][ATGCN]{9}[CN][GN][CN][CN][G]')  # allow dark bases, based on the short pattern.
+bc_pattern_dark = re.compile('[CN][GN][CN][CN][GN][ATGCN]{7}[GN][CN][CN][ATGCN]{9}[CN][GN][CN][CN][GN]')  # allow dark bases, based on the short pattern.
                                                                                                          # should be ok for high quality sequencing with very few Ns.
                                                                                                          # would be problematic if many Ns are present.
 # Empty vector pattern
@@ -154,11 +154,11 @@ def recognize(mypattern, record, fout, bcl = args.bc_len, gtl = args.gt_len, sam
         if barcode.count('N') > dark:
             return True                     # Reject the match. Returning True means I don't need to try the diagnostic patterns.
 
-        if sampleTagLens:                   # If there is a list of tag lengths, there is a demux table, and we gotta extract the samples tag sequence.
-            found = False            # flag to report whether any of the tag lengths resulted in a match
+        if sampleTagLens:                   # If there is a list of tag lengths, there is a demux table, and we gotta extract the sample tag sequence.
+            found = False               # flag to report whether any of the tag lengths resulted in a match
             sampleTag = None
             for k in sampleTagLens:                   # Allows tags of mixed length
-                sampleTag = myread[(start - gtl - k):(start - gtl)].upper()  # The sample tag is at a fixed offset from the barcode.
+                sampleTag = myread[(start - gtl - k):(start - gtl)].upper()  # The sample tag ends at a fixed offset from the barcode.
                 if sampleTag in bc:
                     found = True
                     if not diagnostic:
