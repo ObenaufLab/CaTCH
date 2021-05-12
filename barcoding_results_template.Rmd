@@ -161,7 +161,7 @@ counts_tidy[, Sample := factor(counts_tidy$Sample, levels=sampleNames, ordered=T
 setorder(counts_tidy, Sample, bc_id)
 
 # Now bring it all together.
-all_tidy <- merge(counts_tidy, relative_tidy, by=c("bc_id", "Sample"))
+all_tidy <- merge(counts_tidy, relative_tidy, by=c("bc_id", "Sample"), all=TRUE)
 all_tidy[, Sample := factor(all_tidy$Sample, levels=sampleNames, ordered=TRUE)]
 setorder(all_tidy, Sample, bc_id )
 
@@ -294,12 +294,20 @@ all_tidy[bc_id %in% goodbc, refcount_Good := TRUE]
 all_tidy[, prop_Top := Proportion >= abund_thresh]
 
 # Bring in the sample metadata
-all_tidy <- merge(all_tidy, samples_tidy, by="Sample")
+all_tidy <- merge(all_tidy, samples_tidy, by="Sample", all=TRUE)
 ```
 
 ```{r overview, fig.height=8, fig.width=10}
+message(paste( length(unique(all_tidy[, bc_id])), "barcode sequences overall."  ))
+message(paste( length(unique(all_tidy[(refcount_Good), bc_id])), "barcode sequences with good readcount in the reference."  ))
+message(paste( length(unique(all_tidy[(refcount_Good & count_Good), bc_id])), "barcode sequences with good readcount in the reference(s) and good readcount in a treatment."  ))
+message(paste( length(unique(all_tidy[(!refcount_Good & count_Good), bc_id])), "barcode sequences with bad readcount in the reference(s) and good readcount in a treatment."  ))
+
+message("Barcodes that don't have good readcount in the references are removed from the analysis.")
+all_tidy <- all_tidy[(refcount_Good), ]
+
 # Make tidy summary of counts.
-count_summary <- Reduce(function(x, y){merge(x,y, by='Sample')},
+count_summary <- Reduce(function(x, y){merge(x,y, by='Sample', all=TRUE)},
 			list(all_tidy[, sum(Reads), by=Sample],
 					 all_tidy[Reads>0, .N, by=Sample],
 					 all_tidy[(count_Good), .N, by=Sample],
@@ -530,7 +538,7 @@ my_pairwise_internal_corels <- function(mat, samples = samples_tidy$Sample, meth
 }
 
 
-cf <- dcast(all_tidy[(refcount_Good), ], bc_id ~ Sample, value.var='Proportion', fill=NA_integer_)
+cf <- dcast(all_tidy[, ], bc_id ~ Sample, value.var='Proportion', fill=NA_integer_)
 cat(paste('Number of barcodes used:', nrow(cf)))
 
 cplots <- my_pairwise_internal_corels(mat = cf[,2:length(cf)], method='spearman', prefix=paste0(params$outpref, '_spearman'))
@@ -783,7 +791,7 @@ pcomplexTrt <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFillTrt, 
          gth + theme(panel.grid.major.x = element_blank(), 
          						legend.position="none")
 
-ggplotly( pcomplexGrp, dynamicTicks = TRUE )
+ggplotly( pcomplexTrt, dynamicTicks = TRUE )
 ```
 
 # Interesting barcodes
@@ -806,7 +814,7 @@ all_tidy <- merge(all_tidy, DF[, list(interesting = sum(interesting)), by=bc_id]
 
 # Spread abundances to wide format
 DF <- dcast(all_tidy, bc_id + interesting ~ Sample, value.var=c("Reads", "Proportion"))
-DF <- merge(counts[, .(bc_id, barcode)], DF, by="bc_id")
+DF <- merge(counts[, .(bc_id, barcode)], DF, by="bc_id", all=TRUE)
 setorder(DF, -interesting)
 
 
@@ -815,7 +823,7 @@ fwrite(DF, file=paste0(params$outpref, '_data.tsv'), sep="\t", quote=FALSE)
 
 tmp <- DF[, .N, by=interesting]
 tmp[, cs := cumsum(N)]
-print( DF[ interesting >= tail(tmp[N<10, interesting], 1), .(bc_id, barcode, interesting)] )
+print( DF[ interesting >= tail(tmp[N<10, interesting], 1), .(bc_id, interesting, barcode)] )
 
 interestingbcs <- DF[ interesting >= tail(tmp[N<10, interesting], 1), bc_id]
 
@@ -976,7 +984,7 @@ sessionInfo()
 
 
 
-```{r pdf}
+```{r pdf, include=FALSE}
 pdf(paste0(params$outpref, '_report.pdf'), paper="a4", width=7, height=10)
 
 print ( pdemux )
