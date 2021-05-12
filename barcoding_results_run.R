@@ -21,7 +21,7 @@ spec = matrix(c(
 
 opt = getopt(spec)
 
-# opt <- list(countsFile='/Users/kimon.froussios/Desktop/shona//data_barcode-counts.txt', summariesFile='/Users/kimon.froussios/Desktop/shona/data_summaries.txt', covars='/Users/kimon.froussios/Desktop/shona/config.txt', resultsDir='/Users/kimon.froussios/Desktop/shona/results', count_thresh=10, reportTemplate='/Users/kimon.froussios/Desktop/catch/barcoding_results_template.Rmd')
+# opt <- list(countsFile='/Users/kimon.froussios/Desktop/shona//data_barcode-counts.txt', summariesFile='/Users/kimon.froussios/Desktop/shona/data_summaries.txt', covars='/Users/kimon.froussios/Desktop/shona/config.txt', resultsDir='/Users/kimon.froussios/Desktop/shona/results', count_thresh=10, reportTemplate='/Users/kimon.froussios/Github/catch/barcoding_results_template.Rmd')
 
 if ( !is.null(opt$help) ) {
   cat(getopt(spec, usage=TRUE))
