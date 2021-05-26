@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-## version 0.8.0
+version = '0.8.0.dev'
 
 
 # Demultiplex samples and count the semi-random barcode occurrences in each.
@@ -21,8 +21,8 @@ import pandas as pd
 usage = "Barcoding"
 parser = ArgumentParser(description=usage, formatter_class=RawDescriptionHelpFormatter)
 
-parser.add_argument("-f", "--file", type=str, required=True, dest="bamFile", help="A single BAM file.")
-parser.add_argument("-b", "--barcodesFile", type=str, required=False, help="Optional tab-delimited demultiplexing table.")
+parser.add_argument("-f", "--bamFile", type=str, required=True, help="A single BAM file.")
+parser.add_argument("-d", "--demuxFile", type=str, required=False, help="Optional tab-delimited demultiplexing table.")
 parser.add_argument('-o', "--outdir", type=str, required=False, default="./process", help="Output directory (./process/).")
 
 parser.add_argument('-r', "--revcomp", action='store_true', help="Reverse complement the sample tags (False).")
@@ -44,8 +44,8 @@ prefix = os.path.basename(args.bamFile).replace('.bam', '')
 
 bc = dict()       # dictionary of sample tags
 tagLens = None     # set of sample tag lengths. When not none, demultiplexing will be applied.
-if args.barcodesFile:
-    with(open(args.barcodesFile, 'r')) as f:
+if args.demuxFile:
+    with(open(args.demuxFile, 'r')) as f:
         next(f) # skip header
         forbidden = re.compile('(^[0-9])|([^0-9a-zA-z_])')
         problems = False
@@ -63,7 +63,7 @@ if args.barcodesFile:
                 multiplex = str(Seq(multiplex).reverse_complement())
             bc[multiplex] = sample
         if problems:
-            sys.stderr.write('Sample names must: [1] start with a letter, [2] contain no spaces or symbols (except underscore).\n')
+            sys.stderr.write('Sample names must: [1] start with a letter, [2] contain no unicode, no spaces and no symbols (except underscore).\n')
             sys.exit(0)
     tagLens = {len(x) for x in bc}
 else:
@@ -236,17 +236,30 @@ def natural_sorted(l):
     return sorted(l, key = alphanum_key)
 
 samples = natural_sorted(bcStats.keys())
-with open(os.path.join(args.outdir, prefix, prefix + "_summary.txt"), "w") as fout:
-    for sample in samples:
-        fout.write(sample + "\t" + str(bcStats[sample]) + "\n")
-        sys.stdout.write(sample + "\t" + str(bcStats[sample]) + "\n")
+with open(os.path.join(args.outdir, prefix, prefix + ".log"), "w") as logout:
+    logout.write("CaTCH barcode quantifier version " + version + "\n")
+    logout.write("BAM " + args.bamFile + "\n")
+    logout.write("Demultiplexing " + str(args.demuxFile) + "\n")
+    logout.write("Reverse complement " + str(args.revcomp) + "\n")
+    logout.write("Barcode length " + str(args.bc_len) + "\n")
+    logout.write("Spacer/Genotype length " + str(args.gt_len) + "\n")
+    logout.write("Match spiked-in barcode " + str(args.spikein) + "\n")
+    logout.write("Stringent barcode matching " + str(args.stringent) + "\n")
+    logout.write("Dark bases " + str(args.n_dark) + "\n")
+    logout.write("Custom barcode matching " + str(args.pattern) + "\n\n")
+
+    with open(os.path.join(args.outdir, prefix, prefix + "_summary.txt"), "w") as fout:
+        for sample in samples:
+            fout.write(sample + "\t" + str(bcStats[sample]) + "\n")
+            logout.write(sample + "\t" + str(bcStats[sample]) + "\n")
 
 
-assigned = pd.DataFrame(bcStats.most_common())
-toprogue = pd.DataFrame(unmatchedTags.most_common()).head()
-notdiagnostic = (assigned.iloc[:, 0] != 'BCUnmatched') & (assigned.iloc[:, 0] != 'SampleUnknown') & (assigned.iloc[:, 0] != 'EmptyVector') & (assigned.iloc[:, 0] != 'SpikeIn')
-if len(unmatchedTags) > 0:
-    if toprogue.iloc[0,1] > min(assigned[notdiagnostic].iloc[:,1]):
-        sys.stdout.write("\nIt seems there are unassigned sample tags that have more reads than some of your samples. If this is unexpected, maybe the provided sample tags have typos in them or need to be reverse-complemented.\n")
-        sys.stdout.write(str(toprogue))
-        sys.stdout.write("\n...\n")
+    assigned = pd.DataFrame(bcStats.most_common())
+    toprogue = pd.DataFrame(unmatchedTags.most_common()).head()
+    notdiagnostic = (assigned.iloc[:, 0] != 'BCUnmatched') & (assigned.iloc[:, 0] != 'SampleUnknown') & (assigned.iloc[:, 0] != 'EmptyVector') & (assigned.iloc[:, 0] != 'SpikeIn')
+    if len(unmatchedTags) > 0:
+        if toprogue.iloc[0,1] > min(assigned[notdiagnostic].iloc[:,1]):
+            sys.stdout.write("\nIt seems there are unassigned sample tags that have more reads than some of your samples. If this is unexpected, maybe the provided sample tags have typos in them or need to be reverse-complemented.\n")
+            logout.write("\nIt seems there are unassigned sample tags that have more reads than some of your samples. If this is unexpected, maybe the provided sample tags have typos in them or need to be reverse-complemented.\n")
+            logout.write(str(toprogue))
+            logout.write("\n...\n")

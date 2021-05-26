@@ -9,7 +9,7 @@
 #SBATCH --output=catch.out
 #SBATCH --error=catch.err
 
-## version 0.7.5
+echo "CaTCH version 0.8.0.dev"
 
 
 function usage() {
@@ -33,25 +33,26 @@ ref=1
 revcomp=0
 spikedin=0
 stringent=0
+demux=0
 # Parse options.
-while getopts 'b:c:o:O:v:X:m:n:A:R:ris1234' flag; do
+while getopts 'b:d:o:O:v:X:m:n:A:R:ris1234' flag; do
   case "${flag}" in
     b) bam="${OPTARG}" ;;         # BAM folder.
-    c) barcodes="${OPTARG}" ;;    # Demultiplexing table (for all lengths of sample tags)
-    o) outdir="${OPTARG}" ;;      # Output directory for the counts
-    O) resdir="${OPTARG}" ;;      # Ouptut directory for the analysis report
-    v) covars="${OPTARG}" ;;      # List of samples in desired order, corresponding condition, desired corresponding colour
-    X) SCRIPTSPATH="${OPTARG}" ;; # Where to find all the scripts for this workflow
-    m) hamm="${OPTARG}" ;;        # Hamming distance at which to merge barcodes as likely sequencing errors
-    n) dark="${OPTARG}" ;;        # Number of dark bases to allow in the pattern (0)
+    d) demux=1 ;;                 # Custom demultiplex.
+    o) outdir="${OPTARG}" ;;      # Output directory for the counts.
+    O) resdir="${OPTARG}" ;;      # Ouptut directory for the analysis report.
+    v) covars="${OPTARG}" ;;      # List of samples in desired order, with corresponding demultiplexing tag (optional), group, treatment, and display colour.
+    X) SCRIPTSPATH="${OPTARG}" ;; # Where to find all the scripts for this workflow.
+    m) hamm="${OPTARG}" ;;        # Hamming distance at which to merge barcodes as likely sequencing errors.
+    n) dark="${OPTARG}" ;;        # Number of dark bases to allow in the pattern (0).
     A) abund="${OPTARG}" ;;       # Barcode abundance threshold for the report (0.01).
     R) ref="${OPTARG}" ;;         # Comma seperated list of row numbers in covars to be used as reference samples in report, NOT counting the header line (1).
-    r) revcomp=1 ;;               # Reverse complement the barcodes
-    i) spikedin=1 ;;              # Spike-in barcode was added (hard-coded barcode sequence)
-    s) stringent=1 ;;             # Match full format of semi-random barcodes
-    1) dxcnt=0 ;;                 # Skip demux and count
-    2) dist=0 ;;                  # Skip hammind distance merge
-    3) post=0 ;;                  # Skip table mergers
+    r) revcomp=1 ;;               # Reverse complement the barcodes.
+    i) spikedin=1 ;;              # Spike-in barcode was added (hard-coded barcode sequence).
+    s) stringent=1 ;;             # Match full format of semi-random barcodes.
+    1) dxcnt=0 ;;                 # Skip demux and count.
+    2) dist=0 ;;                  # Skip hammind distance merge.
+    3) post=0 ;;                  # Skip table mergers.
     4) plot=0 ;;                  # Skip analysis report.
     *) usage ;;
   esac
@@ -88,41 +89,38 @@ wait_for_jobs(){
   done
 }
 
-set -e
 
-# Modules
-# echo "${bam}: Loading modules"
-# module load samtools/1.9-foss-2017a
-# module load python/2.7.13-foss-2017a
-# module load biopython/1.70-foss-2017a-python-2.7.13
-# module load pysam/0.14.1-foss-2017a-python-2.7.13
-# module load python-levenshtein/0.12.0-foss-2017a-python-2.7.13
+
+set -e
+# set -x
+
+
 
 prefix=$(basename $bam)
 prefix=${prefix/.bam/}
 
 
 if [ "$dxcnt" -eq 1 ]; then
-    if [[ ! -z "$barcodes" ]]; then
-        barcodes=",-b ${barcodes}"
+    if [[ ! -z "$demux" ]]; then
+        barcodes=",-d ${covars}"
     fi
 
     if [ "$revcomp" -eq 1 ]; then
       revcomp=',-r'
     else
-      revcomp=''
+      unset revcomp
     fi
 
     if [ "$spikedin" -eq 1 ]; then
       spikedin=',-i'
     else
-      spikedin=''
+      unset spikedin
     fi
 
     if [ "$stringent" -eq 1 ]; then
       stringent=',-s'
     else
-      stringent=''
+      unset stringent
     fi
 
     # Match semi-random barcode format, demultiplex, and count the barcodes.
