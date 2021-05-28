@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-## version 0.7.5
+## version 0.8.0.dev
 
 library(getopt)
 
@@ -22,6 +22,8 @@ spec = matrix(c(
 opt = getopt(spec)
 
 # opt <- list(countsFile='/Users/kimon.froussios/Desktop/shona/data_barcode-counts.txt', summariesFile='/Users/kimon.froussios/Desktop/shona/data_summaries.txt', covars='/Users/kimon.froussios/Desktop/shona/samples.txt', resultsDir='/Users/kimon.froussios/Desktop/shona/results', count_thresh=10, reportTemplate='/Users/kimon.froussios/Github/catch/barcoding_results_template.Rmd')
+
+# opt <- list(countsFile='/Users/kimon.froussios/Desktop/andrea/Galaxy54-Collected_Barcode_Counts.txt', summariesFile='/Users/kimon.froussios/Desktop/andrea/Galaxy55-Collected_Barcode_Summaries.txt', covars='/Users/kimon.froussios/Desktop/andrea/samplesgfp.txt', resultsDir='/Users/kimon.froussios/Desktop/andrea/resultsgfp', count_thresh=10, reportTemplate='/Users/kimon.froussios/Github/catch/barcoding_results_template.Rmd')
 
 if ( !is.null(opt$help) ) {
   cat(getopt(spec, usage=TRUE))
