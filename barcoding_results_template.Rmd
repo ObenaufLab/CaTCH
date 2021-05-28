@@ -1,5 +1,5 @@
 ---
-title: "CaTCH report 0.7.5"
+title: "CaTCH report 0.8.0.dev"
 author: "Kimon Froussios"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
@@ -203,34 +203,37 @@ ggplotly( pdemux, dynamicTicks = TRUE)
 
 # Number of reads and barcodes
 
-```{r bcthresh, fig.height=8, fig.width=10}
+```{r bcabund, fig.height=8, fig.width=8}
 # Distribution of barcodes by read-count.
 pbcdist1 <- ggplot(all_tidy, aes(x=Reads+0.01, colour=Sample, fill=Sample)) +
-	geom_density_ridges(aes(y=Sample), alpha=0.4) +
+	geom_density_ridges(aes(y=Sample), alpha=0.4, scale=1) +
 	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
 	scale_x_log10() +
 	annotation_logticks(sides="b") +
 	scale_colour_manual(values=mycolours) +
 	scale_fill_manual(values=mycolours) +
-	labs(x='Reads', title="Barcode coverage", subtitle='including non-detected BCs') +
+	labs(x='Reads', y='Amount of Barcodes', title="Barcode abundances", subtitle='including non-detected BCs') +
 	theme_classic() +
 	theme(panel.grid.minor=element_blank(),
 				legend.position='none')
 
 pbcdist2 <- ggplot(all_tidy[Reads > 0, ], aes(x=Reads, colour=Sample, fill=Sample)) +
-	geom_density_ridges(aes(y=Sample), alpha=0.4) +
+	geom_density_ridges(aes(y=Sample), alpha=0.4, scale=1) +
 	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
 	scale_x_log10() +
 	annotation_logticks(sides="b") +
 	scale_colour_manual(values=mycolours) +
 	scale_fill_manual(values=mycolours) +
-	labs(x='Reads', subtitle='only detected BCs') +
+	labs(x='Reads', y=NULL, subtitle='only detected BCs') +
 	theme_classic() +
 	theme(panel.grid.minor=element_blank(),
+				axis.text.y= element_blank(),
 				legend.position='none')
 
 print( pbcdist1 | pbcdist2 )
+```
 
+```{r bcthresh, fig.height=5, fig.width=8}
 # Effect of readcount threshold on number of barcodes.
 bcbythresh <- Reduce(rbind, lapply(c(1:9, seq(10, 10000, 10)), function(x){
 		dt <- all_tidy[Reads >= x, nrow(.SD), by=Sample]    # In long format, every row is one barcode in one sample
@@ -309,7 +312,7 @@ all_tidy <- merge(all_tidy, samples_tidy, by="Sample", all=TRUE)
 
 Reads, barcodes, count-filtered barcodes, and top-percentage barcodes.
 
-```{r overview, fig.height=8, fig.width=10}
+```{r overview, fig.height=8, fig.width=8}
 message(paste( length(unique(all_tidy[, bc_id])), "barcode sequences overall."  ))
 if(!is.null(params$refsamps)){
 	message(paste( length(unique(all_tidy[(refcount_Good), bc_id])), "barcode sequences with good readcount in the reference(s)."  ))
@@ -558,8 +561,6 @@ my_pairwise_internal_corels <- function(mat, samples = samples_tidy$Sample, meth
                sdrc=p3a, tdrc=p4a, drc=p34a) )
 }
 
-
-
 cplots <- my_pairwise_internal_corels(mat = cf[,2:length(cf)], method='spearman', prefix=paste0(params$outpref, '_spearman'))
 print( cplots[["frnc"]] + cplots[["drc"]] )
 ```
@@ -613,36 +614,47 @@ setorder(sharedBarcodes, -N)
 setorder(sharedBarcodesGrp, -N)
 setorder(sharedBarcodesTrt, -N)
 
-sharedBarcodes <- Reduce(rbind,
-			 apply(sharedBarcodes, 1, function(x){
-			 	all_tidy[prop_Top & bc_id==x['bc_id'], .(.N, paste(Sample, collapse = " ; ")), by=bc_id]
-			 	})
-)
-setnames(sharedBarcodes, c("bc_id", "nShared", "Samples"))
+if (nrow(sharedBarcodes) > 0){
+	sharedBarcodes <- Reduce(rbind,
+				 apply(sharedBarcodes, 1, function(x){
+				 	all_tidy[prop_Top & bc_id==x['bc_id'], .(.N, paste(Sample, collapse = " ; ")), by=bc_id]
+				 	})
+	)
+	setnames(sharedBarcodes, c("bc_id", "nShared", "Samples"))
+	all_tidy <- merge(all_tidy, sharedBarcodes[, .(bc_id, nShared)], by="bc_id", all=TRUE)
+} else {
+	message("No shared Barcodes across Samples.")
+	all_tidy[, nShared := 0]
+}
 
-sharedBarcodesGrp <- Reduce(rbind,
-			 apply(sharedBarcodesGrp, 1, function(x){
-			 	all_tidy[prop_Top & bc_id==x['bc_id'] & Group==x['Group'], .(.N, paste(Sample, collapse = " ; ")), by=c("Group", "bc_id")]
-			 	})
-)
-setnames(sharedBarcodesGrp, c("group", "bc_id", "nSharedGrp", "Samples"))
-sharedBarcodesGrp <- sharedBarcodesGrp[! bc_id %in% sharedBarcodesGrp[duplicated(bc_id), bc_id], ]  # duplicated barcodes are not unique to the group.
+if (nrow(sharedBarcodesGrp) > 0){
+	sharedBarcodesGrp <- Reduce(rbind,
+				 apply(sharedBarcodesGrp, 1, function(x){
+				 	all_tidy[prop_Top & bc_id==x['bc_id'] & Group==x['Group'], .(.N, paste(Sample, collapse = " ; ")), by=c("Group", "bc_id")]
+				 	})
+	)
+	setnames(sharedBarcodesGrp, c("group", "bc_id", "nSharedGrp", "Samples"))
+	sharedBarcodesGrp <- sharedBarcodesGrp[! bc_id %in% sharedBarcodesGrp[duplicated(bc_id), bc_id], ]  # duplicated barcodes are not unique to the group.
+	all_tidy <- merge(all_tidy, sharedBarcodesGrp[, .(bc_id, nSharedGrp)], by="bc_id", all=TRUE)
+} else {
+	message("No shared Barcodes across Groups.")
+	all_tidy[, nSharedGrp := 0]
+}
 
-sharedBarcodesTrt <- Reduce(rbind,
-			 apply(sharedBarcodesTrt, 1, function(x){
-			 	all_tidy[prop_Top & bc_id==x['bc_id'] & Treatment==x['Treatment'], .(.N, paste(Sample, collapse = " ; ")), by=c("Treatment", "bc_id")]
-			 	})
-)
-setnames(sharedBarcodesTrt, c("treatment", "bc_id", "nSharedTrt", "Samples"))
-sharedBarcodesTrt <- sharedBarcodesTrt[! bc_id %in% sharedBarcodesTrt[duplicated(bc_id), bc_id], ]  # duplicated barcodes are not unique to the treatment.
+if (nrow(sharedBarcodesTrt) > 0){
+	sharedBarcodesTrt <- Reduce(rbind,
+				 apply(sharedBarcodesTrt, 1, function(x){
+				 	all_tidy[prop_Top & bc_id==x['bc_id'] & Treatment==x['Treatment'], .(.N, paste(Sample, collapse = " ; ")), by=c("Treatment", "bc_id")]
+				 	})
+	)
+	setnames(sharedBarcodesTrt, c("treatment", "bc_id", "nSharedTrt", "Samples"))
+	sharedBarcodesTrt <- sharedBarcodesTrt[! bc_id %in% sharedBarcodesTrt[duplicated(bc_id), bc_id], ]  # duplicated barcodes are not unique to the treatment.
+	all_tidy <- merge(all_tidy, sharedBarcodesTrt[, .(bc_id, nSharedTrt)], by="bc_id", all=TRUE)
+} else {
+	message("No shared Barcodes across Treatments.")
+	all_tidy[, nSharedTrt := 0]
+}
 
-
-# Create selection variable for shared top-ness.
-all_tidy <- Reduce(function(a,b){merge(a, b, by="bc_id", all=TRUE)}, 
-			 list(all_tidy, 
-			 		  sharedBarcodes[, .(bc_id, nShared)],
-			 		  sharedBarcodesGrp[, .(bc_id, nSharedGrp)],
-			 		  sharedBarcodesTrt[, .(bc_id, nSharedTrt)]) )
 
 all_tidy[, any_Good := sum(count_Good & refcount_Good) > 0, by=bc_id]
 all_tidy[is.na(nShared) & any_Good, nShared := 1]
@@ -678,7 +690,7 @@ dropped <- unique(all_tidy$Sample)[! unique(all_tidy$Sample) %in% unique(tmp$Sam
 if(length(dropped) > 0)
   tmp <- rbind(tmp, data.frame(Sample=dropped, bc_id=NA_character_, Reads=0, Proportion=0, count_Good=NA, refcount_Good=NA,
   														 prop_Top=FALSE, Tag=NA_character_, Group=NA_character_, Treatment=NA_character_,
-  														 nShared=NA_integer_, nSharedGrp=NA_integer_, nSharedTrt=NA_integer_,  any_Good=NA, 
+  														 nShared=NA_integer_, nSharedGrp=NA_integer_, nSharedTrt=NA_integer_, any_Good=NA, 
   														 sharedFill=NA_integer_) )
 fillup <- tmp[, .(Sample, Proportion)] [, 1-sum(Proportion), by=Sample]
 setnames(fillup, c("Sample", "Proportion"))
@@ -692,9 +704,11 @@ elem <- as.character(unique(tmp$sharedFill[!is.na(tmp$sharedFill) & ! tmp$shared
 if (length(elem) > length(mycolours)){
 	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
 	elemcol <- getPalette(length(elem))
-} else {
+} else if (length(elem) > 0) {
 	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
 	elemcol <- mycolours[1:length(elem)]
+} else {
+	elemcol <- character(0)
 }
 names(elemcol) <- elem
 elemcol["notshared"] <- "grey70"
@@ -703,9 +717,8 @@ elemcol["fillup"] <- "grey95"
 pcomplex <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFill, group="A", label=bc_id)) +
          geom_bar(stat='identity', position=position_stack(), colour="black", width=0.9, size=0.2) +
          scale_y_continuous(expand = c(0, 0), limits= c(0,1)) +
-         scale_fill_manual(values=elemcol) +
-         ylab("Individual barcode proportion") +
-         labs(title=paste0("Barcodes with at least ", abund_thresh * 100,"% representation"), x='') +
+         scale_fill_manual(values=elemcol, na.value='black') +
+         labs(title="Re-occurring enriched barcodes across all samples", x=NULL, y="Proportion of reads") +
          gth + theme(panel.grid.major.x = element_blank(), 
          						legend.position="none")
 
@@ -746,9 +759,11 @@ elem <- as.character(unique(tmp$sharedFillGrp[!is.na(tmp$sharedFillGrp) & ! tmp$
 if (length(elem) > length(mycolours)){
 	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
 	elemcol <- getPalette(length(elem))
-} else {
+} else if (length(elem) > 0) {
 	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
 	elemcol <- mycolours[1:length(elem)]
+} else {
+	elemcol <- character(0)
 }
 names(elemcol) <- elem
 elemcol["notshared"] <- "grey70"
@@ -758,9 +773,8 @@ pcomplexGrp <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFillGrp, 
          geom_bar(stat='identity', position=position_stack(), colour="black", width=0.9, size=0.2) +
          scale_y_continuous(expand = c(0, 0), limits= c(0,1),
                             sec.axis = sec_axis(trans = ~ .)) +
-         scale_fill_manual(values=elemcol) +
-         ylab("Individual barcode proportion") +
-         labs(title=paste0("Barcodes with at least ", abund_thresh * 100,"% representation"), x='') +
+         scale_fill_manual(values=elemcol, na.value='black') +
+         labs(title="Re-occurring enriched barcodes within a single Group", x=NULL, y="Proportion of reads") +
          gth + theme(panel.grid.major.x = element_blank(), 
          						legend.position="none")
 
@@ -802,9 +816,11 @@ elem <- as.character(unique(tmp$sharedFillTrt[!is.na(tmp$sharedFillTrt) & ! tmp$
 if (length(elem) > length(mycolours)){
 	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
 	elemcol <- getPalette(length(elem))
-} else {
+} else if (length(elem) > 0) {
 	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
 	elemcol <- mycolours[1:length(elem)]
+} else {
+	elemcol <- character(0)
 }
 names(elemcol) <- elem
 elemcol["notshared"] <- "grey70"
@@ -814,9 +830,8 @@ pcomplexTrt <- ggplot(data=tmp, aes(x=Sample, y=Proportion, fill=sharedFillTrt, 
          geom_bar(stat='identity', position=position_stack(), colour="black", width=0.9, size=0.2) +
          scale_y_continuous(expand = c(0, 0), limits= c(0,1),
                             sec.axis = sec_axis(trans = ~ .)) +
-         scale_fill_manual(values=elemcol) +
-         ylab("Individual barcode proportion") +
-         labs(title=paste0("Barcodes with at least ", abund_thresh * 100,"% representation"), x='') +
+         scale_fill_manual(values=elemcol, na.value='black') +
+         labs(title="Re-occurring enriched barcodes within a single Treatment", x=NULL, y="Proportion of reads") +
          gth + theme(panel.grid.major.x = element_blank(), 
          						legend.position="none")
 
@@ -839,7 +854,7 @@ all_tidy[(count_Good), prop_rank := rank(Proportion), by=Sample]
 all_tidy[(any_Good), cum_rank := sum(prop_rank, na.rm=TRUE), by=bc_id]
 
 p1 <- ggplot(unique(all_tidy[cum_rank>0, .(bc_id, cum_rank)]), aes(x=cum_rank)) +
-	geom_histogram(bins=max(all_tidy$cum_rank)/2) +
+	geom_histogram(bins=min(max(all_tidy$cum_rank)/2, 200)) +
 	labs(x="Cumulative rank", y="Barcodes", title="Potential interest") +
 	theme_light()
 
