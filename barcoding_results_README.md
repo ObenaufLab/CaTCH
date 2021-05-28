@@ -31,6 +31,11 @@ CAATT   treatmentB_2    treated     treatmentB    orange
 * Column 1 is optional.
 
 
+**Important:** This step allows you to specify one or more samples as reference samples. If you provide this, barcodes that were not seen in the reference(s) will be filtered out from all the other samples as well. Use this only if you have samples collected at the beginning of the screen and you have sufficient sequencing depth to have confidence that no barcodes were missed.
+
+The reference sample(s) will also be used to give short names to the barcodes, in order of decreasing abundance. If no references are specified, the barcodes will be named by order of abundance in the first sample. This does not affect the results per se, but can confuse comparison of results from different runs, if the barcode names are based on different samples. However, the results do also include the barcode sequences, which can be used to match the results across runs.
+
+
 ## Command line 
 
 **barcoding_results_run.R**
@@ -72,7 +77,7 @@ Memory:   Estimated memory use. The default 4GB should be plenty. Increase this 
 
 ```
 Collected Barcode Counts: The collective table of barcode readcounts created in the previous step.
-Collected Barcode Counts: The collective tablee of summaries created in the previous step.
+Collected Barcode Summaries: The collective tablee of summaries created in the previous step.
 Conditions and Colours:   The description table.
 ```
 
@@ -81,5 +86,5 @@ Conditions and Colours:   The description table.
 ```
 Count threshold for barcodes:                                                           Minimum number of reads required for a barcode to be worth considering.
 Proportional abundance threshold:                                                       Minimum percentage of a sample's reads required for a barcode to be considered enriched.
-Comma-separated list of integers designating the samples to use as reference abundance: In order of appearance in the description table.
+Comma-separated list of integers designating the samples to use as reference abundance: In order of appearance in the description table. Optional.
 ```

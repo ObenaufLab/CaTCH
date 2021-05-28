@@ -2,12 +2,14 @@
 
 CaTCH is a wetlab method for identifying cell clones from barcoded populations using CRISPRa-inducible reporters, developed in the Obenauf lab at the Intstitute for Molecular Pathology in Vienna.
 
-Nat Biotechnol. 2021 Feb;39(2):174-178.
-PMID: 32719478
+*Isolating live cell clones from barcoded populations using CRISPRa-inducible reporters.*
+**Nat Biotechnol. 2021 Feb;39(2):174-178.**
+
+PMID: 32719478 
 DOI: 10.1038/s41587-020-0614-0
 
-This package comprises the analysis steps for the sequencing data generated with the CaTCH method.
-It is available as a command-line tool for everyone, and for the members of the Vienna Biocenter only it is also implemented as a Galaxy tool on the VBC Galaxy server.
+This software package comprises the analysis steps for the sequencing data generated with the CaTCH method.
+It is available as a command-line tool for everyone, and for the members of the Vienna Biocenter only it is also implemented in the VBC's Galaxy server.
 
 This README file outlines the general workflow. For information on an individual step please consult the respective README file for that step.
 
@@ -24,12 +26,12 @@ It is possible to use multiple multiplexed BAMs, but they may have to be quantif
 
 #### Two barcode designs have been tested:
 
-Christian Umkehrer's original design allows the sample index to be contained in the first read. This design can be demultiplexed and quantified in a single step with the barcodingQuantifieer.py script, so no additional step is required for pooled lanes.
+Christian Umkehrer's original design allows the sample index to be contained in the first read. This design can be demultiplexed and quantified in a single step with the barcodingQuantifier.py script, so no additional step is required for pooled lanes.
 
 *5'-P5adapter_NNNNNN_SampleINDEX_GenotypeTag_BARCODE_template_P7adapter-3'*
 
 In an effort to move the barcode closer to the start of the read for higher quality, Shona Cronin's design moves the sample index to the end of the construct. It is unlikely that the first read will contain the sample index intact,
-so pooled lanes with this design need to be demultiplexed in advance using the second read of the pair.
+so pooled lanes with this design need to be demultiplexed in advance (outside of this package) using the second read of the pair.
 
 *5'-P5adapter_GenotypeTag_BARCODE_template_SampleIndex_P7adapter-3'*
 
@@ -37,14 +39,14 @@ so pooled lanes with this design need to be demultiplexed in advance using the s
 
 You will need to compile a table with the following columns and in that order:
 
-1. Tag - The sample index. This should be a valid nucleotide [ATGC]. A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications.
-2. Sample - A name for the sample.
-3. Group - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
-4. Treatment - The specific treatment far that sample.
-5. Colour - This is for display purposes in plots. You can use any colour name recognised by R.
+1. `Tag` - The sample index. This should be a valid oligonucleotide (`[ATGC]`, no wildcards). A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications.
+2. `Sample` - A name for the sample.
+3. `Group` - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
+4. `Treatment` - The specific treatment far that sample.
+5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R.
 
-For columns 2, 3 and 4 the values must be plain ASCII *alphanumeric* strings, *starting with a letter*. *Underscores* (_) are allowed. 
-No accented or special letters, no spaces, no other symbols (including dashes).
+For columns 2, 3 and 4 the **values must be** plain ASCII alphanumeric strings, starting with a letter. Underscores are allowed. 
+No accented or special letters, no spaces, no other symbols (including dashes). `^[A-Za-z][A-Za-z0-9_]*`
 
 Column 1 is optional and only applies to multiplexed BAM files using Christian's design for the barcode construct.
 
@@ -65,14 +67,14 @@ CAATT   treatmentB_2    treated     treatmentB    orange
 ## Workflow - VBC Galaxy
 
 The VBC Galaxy instance is not public. These instructions are for internal institute use only. 
-For general use, consult the next section: "Workflow - Command line".
+For general use, please consult the next section: "Workflow - Command line".
 
 ### Step 1 : Quantify barcodes
 
 **Groups/Obenauf/catch barcode quantifier**
 
 * Each BAM file needs to be quantified separately. 
-* Multiplexed BAMs using Christian's design require each its own description table with just the relevant samples. Only the Tag and Sample columns are required, the other 3 columns are optional for this step.
+* Each multiplexed BAM using Christian's design requires its own description table with just the relevant samples. Only the `Tag` and `Sample` columns are required, the other 3 columns are optional for this step.
 
 Quantification will generate a read counts table for each sample. A summary table for each BAM will also be created.
 
@@ -81,17 +83,14 @@ Quantification will generate a read counts table for each sample. A summary tabl
 **Groups/Obenauf/catch barcode merger**
 
 The individual sample outputs need to be combined: One collective table for all the barcode read counts, and one 
-collective table for the summaries. Simply select the Step-1 Galaxy outputs to combine. Importing
-external tables into Galaxy at this stage to be merged into the collective tables is *not well supported*. 
+collective table for the summaries. Simply select the Step-1 Galaxy outputs to combine.
 
 ### Step 3: Visual report
 
 **Groups/Obenaud/catch report**
 
 * This requires the two collective tables (barcode counts and summaries) from Step 2. 
-* Additionally it needs the description table containing all the samples from all the input BAMs. The Tag column is optional.
-
-If for some reason you want to exclude some samples from the analysis (for example due to quality issues), remove the respective rows from the description table.
+* Additionally it needs the description table with the samples to be included in the report. The `Tag` column is optional.
 
 
 
