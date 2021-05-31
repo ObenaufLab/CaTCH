@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-## version 0.7.5
+## version 0.8.0.dev
 
 library(getopt)
 
@@ -13,7 +13,7 @@ spec = matrix(c(
   'resultsDir'      , 'd', 1, "character", "Directory in which to save all output.",
   'reportTemplate'  , 'T', 1, "character", "Template Rmd file for CaTCH report.",
   'covars'          , 'v', 1, "character", "Table file listing sample names ('Sample') (in desired order), coarse sample grouping for identifying shared barcodes ('Group'), respective condition for each sample ('Treatment') and desired display colour for each sample ('Colour') (in R-compatible format, preferably avoid 'white'). For convenience, an optional field 'Tag' is allowed as the first column, to permit using one table for the whole pipeline. Full path needed.",
-  'refsamps'        , 'r', 1, "character", "Comma-separated list of rows designating the samples to use as reference abundance (in order they appear in covars, not counting the header row).",
+  'refsamps'        , 'r', 2, "character", "Optional, comma-separated list of rows designating the samples to use as reference abundance (in order they appear in covars, not counting the header row). Used for naming and filtering the barcodes. If omitted, the barcodes will be named by their abindance in thee first available sample, and no filtering based on reference count will take place.",
   'count_thresh'    , 'N', 1, "integer",   "Count threshold for barcodes to analyse",
   'abund_thresh'    , 'A', 1, "numeric",   "Proportional abundance threshold to consider barcodes top hits",
   'extrabc'         , 'B', 1, "character", "Comma-separated list of barcode IDs to include in addition to those chosen by the analysis. No spaces."
@@ -21,7 +21,9 @@ spec = matrix(c(
 
 opt = getopt(spec)
 
-# opt <- list(countsFile='/Users/kimon.froussios/Desktop/shona//data_barcode-counts.txt', summariesFile='/Users/kimon.froussios/Desktop/shona/data_summaries.txt', covars='/Users/kimon.froussios/Desktop/shona/config.txt', resultsDir='/Users/kimon.froussios/Desktop/shona/results', count_thresh=10, reportTemplate='/Users/kimon.froussios/Github/catch/barcoding_results_template.Rmd')
+# opt <- list(countsFile='/Users/kimon.froussios/Desktop/shona/data_barcode-counts.txt', summariesFile='/Users/kimon.froussios/Desktop/shona/data_summaries.txt', covars='/Users/kimon.froussios/Desktop/shona/samples.txt', resultsDir='/Users/kimon.froussios/Desktop/shona/results', count_thresh=10, reportTemplate='/Users/kimon.froussios/Github/catch/barcoding_results_template.Rmd')
+
+# opt <- list(countsFile='/Users/kimon.froussios/Desktop/andrea/Galaxy54-Collected_Barcode_Counts.txt', summariesFile='/Users/kimon.froussios/Desktop/andrea/Galaxy55-Collected_Barcode_Summaries.txt', covars='/Users/kimon.froussios/Desktop/andrea/samplesgfp.txt', resultsDir='/Users/kimon.froussios/Desktop/andrea/resultsgfp', count_thresh=10, reportTemplate='/Users/kimon.froussios/Github/catch/barcoding_results_template.Rmd')
 
 if ( !is.null(opt$help) ) {
   cat(getopt(spec, usage=TRUE))
@@ -47,9 +49,7 @@ if ( is.null(opt$abund_thresh) ) {
   opt$abund_thresh <- 0.005
 }
 
-if ( is.null(opt$refsamps) ) {
-  opt$refsamps <- 1
-} else {
+if ( !is.null(opt$refsamps) ) {
   opt$refsamps <- as.integer(strsplit(opt$refsamps, ',', fixed=TRUE)[[1]])
 }
 
