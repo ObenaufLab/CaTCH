@@ -165,10 +165,12 @@ This will compile a report using the **barcoding_results_template.Rmd** template
 
 **catch_workflow.sh**
 
-The workflow can be executed directly step by step, as described in the previous sections. This shell script is not required to analyse CaTCH data.
+The analysis can be executed step by step, as described in the previous sections. That is the most likely use case for you.
 
-This is my Bash script to automate steps 1-4. It requires a SLURM environment, and assumes all the dependencies have been made available in advance. 
-**I cannot promise it will work for you**, but at the very least it can be used as template to write a new pipeline. 
+The Bash script included here is my rough automation of steps 1-4. The script depends on a SLURM environment, and assumes all the software dependencies have been made available in advance. This script is entirely optional. **I cannot promise it will work for you**, it probably won't. But at the very least it can serve as a template from which to adapt a new script that is suitable for your system.  
+ 
+
+
 
 #### Parameters:
 
