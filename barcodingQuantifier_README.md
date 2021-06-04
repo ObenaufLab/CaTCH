@@ -100,13 +100,18 @@ CAATT   treatmentB_2    treated     treatmentB    orange
 ### Main options
 
 `read files`: A single BAM file.
+
 `barcodes`:   Optional demultiplexing table for use with Christian's design. This may be the description table or a subset of it. Omit completely if the BAM contains a single sample.
 
 ### Advanced options
 
 `rev-comp sample tags`:       Reverse complement the sample tags. Try this if you get unexpectedly low counts across multiple samples.
+
 `Stringent barcode matching`: Use the longer more-explicit pattren to match barcodes.
+
 `Number of dark bases`:       Number of undefined (N) bases to allow. This uses a special version of the short pattern and is quite low-tech, keep this number low to prevent unreliable recognition of the barcodes.
-`Length of the barcode`:      Self-explanatory.
+
+`Length of the barcode`:      Length of the CaTCH barcode.
+
 `Genotyping tag`:             Length of the sequence between the sample tag and the barcode. Intended as paceholder for genotyping tags, it is currently treated only as a spacer.
 
