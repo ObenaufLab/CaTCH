@@ -32,15 +32,15 @@ so pooled lanes with this design need to be demultiplexed in advance using the s
 
 ### Data description
 
-A table with the following columns and in that order is helpful to have from the beginning:
+A table with the following columns and in that order is helpful to have from the beginning covering all the samples to be analyzed:
 
-1. Tag - The sample index. This should be a valid nucleotide [ATGC]. A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications.
-2. Sample - A name for the sample.
-3. Group - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
-4. Treatment - The specific treatment far that sample.
-5. Colour - This is for display purposes in plots. You can use any colour name recognised by R.
+1. `Tag` - The sample index. This should be a valid nucleotide [ATGC]. A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications. If mixing multiplexed and non-multiplexed BAMs, use a dummy Tag like `XXXX` for Samples that are already in their own BAM.
+2. `Sample` - A name for the sample.
+3. `Group` - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
+4. `Treatment` - The specific treatment far that sample.
+5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R.
 
-For column 2 the values must be plain ASCII *alphanumeric* strings, *starting with a letter*. *Underscores* (_) are allowed. 
+For column 2 the values must be plain ASCII alphanumeric strings, starting with a letter. Underscores (`_`) are allowed. 
 No accented or special letters, no spaces, no other symbols (including dashes).
 
 ```
@@ -55,9 +55,9 @@ ATCCC   treatmentB_1    treated     treatmentB    orange
 CAATT   treatmentB_2    treated     treatmentB    orange
 ```
 
-* If the BAM file is not multiplexed, the description table is irrelevant and can be ommitted altogether from this step.
+* If the BAM file is not multiplexed, the description table is irrelevant and **should be ommitted** completely for quantifying that file.
 * Each multiplexed BAM file will need its own demultiplexing table. The easiest way to do it is to create a duplicate of the description table and delete the rows that are not samples contained in the given BAM file.
-* If *none* of the sample tags is reused for different samples in diffeerent lanes, you may be able to use the description table in its original form for each BAM file, without needing to create duplicates with subsets of the samples.
+* If none of the sample tags is reused for different samples in diffeerent lanes, you may be able to use the description table in its original form for each BAM file, without needing to create duplicates with subsets of the samples.
 
 
 ## Command line
@@ -94,24 +94,19 @@ CAATT   treatmentB_2    treated     treatmentB    orange
 
 ### Cluster options
 
-```
-Walltime: Estimated completion time. Quantification runs fairly fast and providing a shorter estimate will help the job get allocated sooner. Though that depends on the size of the BAM file, an hour should be adequate.
-Memory:   Estimated memory use. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors. Again it will depend on the size of your BAM files.
-```
+`Walltime`: Estimated completion time. Quantification runs fairly fast and providing a shorter estimate will help the job get allocated sooner. Though that depends on the size of the BAM file, an hour should be more than adequate, often may be just a few minutes.
+`Memory`:   Estimated memory use. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors. Again it will depend on the size of your BAM files.
 
 ### Main options
 
-```
-read files: A single BAM file.
-barcodes:   Optional demultiplexing table for use with Christian's design. This may be the description table or a subset of it. Omit completely if the BAM contains a single sample.
-```
+`read files`: A single BAM file.
+`barcodes`:   Optional demultiplexing table for use with Christian's design. This may be the description table or a subset of it. Omit completely if the BAM contains a single sample.
 
 ### Advanced options
 
-```
-rev-comp sample tags:       Reverse complement the sample tags. Try this if you get unexpectedly low counts across multiple samples.
-Stringent barcode matching: Use the longer more-explicit pattren to match barcodes.
-Number of dark bases:       Number of undefined (N) bases to allow. This uses a special version of the short pattern and is quite low-tech, keep this number low to prevent unreliable recognition of the barcodes.
-Length of the barcode:      Self-explanatory.
-Genotyping tag:             Length of the sequence between the sample tag and the barcode. Intended as paceholder for genotyping tags, it is currently treated only as a spacer.
-```
+`rev-comp sample tags`:       Reverse complement the sample tags. Try this if you get unexpectedly low counts across multiple samples.
+`Stringent barcode matching`: Use the longer more-explicit pattren to match barcodes.
+`Number of dark bases`:       Number of undefined (N) bases to allow. This uses a special version of the short pattern and is quite low-tech, keep this number low to prevent unreliable recognition of the barcodes.
+`Length of the barcode`:      Self-explanatory.
+`Genotyping tag`:             Length of the sequence between the sample tag and the barcode. Intended as paceholder for genotyping tags, it is currently treated only as a spacer.
+
