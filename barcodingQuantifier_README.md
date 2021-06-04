@@ -95,6 +95,7 @@ CAATT   treatmentB_2    treated     treatmentB    orange
 ### Cluster options
 
 `Walltime`: Estimated completion time. Quantification runs fairly fast and providing a shorter estimate will help the job get allocated sooner. Though that depends on the size of the BAM file, an hour should be more than adequate, often may be just a few minutes.
+
 `Memory`:   Estimated memory use. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors. Again it will depend on the size of your BAM files.
 
 ### Main options
