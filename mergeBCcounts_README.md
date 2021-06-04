@@ -24,15 +24,13 @@ mergeBCcounts.R OUTPUT_FILE INPUT_FILE INPUT_FILE ...
 
 ### Cluster options
 
-```
-Walltime: Estimated completion time. This step takes a few seconds.
-Memory:   Estimated memory use. The default 4GB should be plenty. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors. It will depend on the  number of samples and number of identified barcodes.
-```
+`Walltime`: Estimated completion time. This step takes a few seconds.
+
+`Memory`:   Estimated memory use. The default 4GB should be plenty. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors. It will depend on the  number of samples and number of identified barcodes.
+
 
 ### Main options
 
-```
-barcode counts: Either all the barcode counts files from Step 1, or all the summary files from Step 1.
-```
+`barcode counts`: Either all the barcode counts files from Step 1, or all the summary files from Step 1.
 
 You will need to run it separately for the barcode counts and for the summaries.
