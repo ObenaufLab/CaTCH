@@ -7,13 +7,13 @@ This creates:
 * a table with the counts and percentages of barcodes and their assigned IDs, and
 * a table with the pairwise sample correlations.
 
-In addition to the outputs of Step 3, the report needs the description table:
+In addition to the collective count and summary tables from the previous step, the report also needs the description table:
 
-1. Tag - The sample index. This should be a valid nucleotide [ATGC]. A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications.
-2. Sample - A name for the sample.
-3. Group - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
-4. Treatment - The specific treatment far that sample.
-5. Colour - This is for display purposes in plots. You can use any colour name recognised by R. A suggeested colourset to choose from could be: black, red, dodgerblue, steelblue, forestgreen, darkgold, magenta
+1. `Tag` - The sample index. This column is not used in this step, so it can be omitted or contain dummy values like XXXX.
+2. `Sample` - The unique name of the sample.
+3. `Group` - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
+4. `Treatment` - The specific treatment far that sample.
+5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R. A suggested colourset to choose from could be: black, red, orange, dodgerblue, steelblue, forestgreen, darkgold, magenta, purple.
 
 ```
 Tag     Sample          Group       Treatment     Colour
@@ -27,7 +27,7 @@ ATCCC   treatmentB_1    treated     treatmentB    orange
 CAATT   treatmentB_2    treated     treatmentB    orange
 ```
 
-* For columns 2, 3 and 4 the values must be plain ASCII *alphanumeric* strings, *starting with a letter*. *Underscores* (_) are allowed. No accented or special letters, no spaces, no other symbols (including dashes).
+* For columns 2, 3 and 4 the values must be plain ASCII alphanumeric strings, starting with a letter. Underscores `_` are allowed. No accented or special letters, no spaces, no other symbols (including dashes).
 * Column 1 is optional.
 
 
