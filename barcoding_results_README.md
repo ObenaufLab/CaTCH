@@ -68,23 +68,23 @@ Please provide **full paths** to the files and directories.
 
 ### Cluster options
 
-```
-Walltime: Estimated completion time. This step takes a few minutes.
-Memory:   Estimated memory use. The default 4GB should be plenty. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors.
-```
+`Walltime`: Estimated completion time. This step takes a few minutes.
+
+`Memory`: Estimated memory use. The default 4GB should be plenty. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors.
 
 ### Main options
 
-```
-Collected Barcode Counts: The collective table of barcode readcounts created in the previous step.
-Collected Barcode Summaries: The collective tablee of summaries created in the previous step.
-Conditions and Colours:   The description table.
-```
+`Collected Barcode Counts`: The collective table of barcode readcounts created in the previous step.
+
+`Collected Barcode Summaries`: The collective tablee of summaries created in the previous step.
+
+`Conditions and Colours`: The description table.
 
 ### Advanced options
 
-```
-Count threshold for barcodes:                                                           Minimum number of reads required for a barcode to be worth considering.
-Proportional abundance threshold:                                                       Minimum percentage of a sample's reads required for a barcode to be considered enriched.
-Comma-separated list of integers designating the samples to use as reference abundance: In order of appearance in the description table. Optional.
-```
+`Count threshold for barcodes`: Minimum number of reads required for a barcode to be worth considering.
+
+`Proportional abundance threshold`: Minimum percentage of a sample's reads required for a barcode to be considered enriched.
+
+`Comma-separated list of integers designating the samples to use as reference abundance`: In order of appearance in the description table. Optional.
+
