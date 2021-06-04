@@ -1,4 +1,4 @@
-# CaTCH 0.8.0
+# CaTCH 0.8.0.dev
 
 CaTCH is a wetlab method for identifying cell clones from barcoded populations using CRISPRa-inducible reporters, developed in the Obenauf lab at the Institute for Molecular Pathology in Vienna.
 
