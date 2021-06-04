@@ -37,12 +37,12 @@ so pooled lanes with this design need to be demultiplexed in advance (outside of
 
 ### Data description
 
-You will need to compile a table with the following columns and in that order:
+You will need to compile a table with all the samples to be analyzed, containing the following columns and in that order:
 
-1. `Tag` - The sample index. This should be a valid oligonucleotide (`[ATGC]`, no wildcards). A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications.
-2. `Sample` - A name for the sample.
+1. `Tag` - The sample index. This should be a valid oligonucleotide (`[ATGC]`, no wildcards). A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications. If mixing multiplexed and non-multiplexed BAMs, use a dummy value like `XXXX` for Samples that don't need demultiplexing.
+2. `Sample` - A unique name for each sample.
 3. `Group` - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
-4. `Treatment` - The specific treatment far that sample.
+4. `Treatment` - The specific treatment for that sample.
 5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R. Most plain colour names (in lowercase) are recognised, though some are not as pleasant to look at. A suggested selection to choose from is: black, grey01 (dark) through grey99 (light), red, organge, darkgold, forestgreen, dodgerblue, steelblue, magenta, purple.
 
 For columns 2, 3 and 4 the **values must be** plain ASCII alphanumeric strings, starting with a letter. Underscores are allowed. 
