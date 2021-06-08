@@ -100,9 +100,9 @@ CAATT   treatmentB_2    treated     treatmentB    orange
 
 ### Main options
 
-`read files`: A single BAM file.
+`read files`: Multiple non-multiplexed BAM files, or a single multiplexed BAM.
 
-`barcodes`:   Optional demultiplexing table for use with Christian's design. This may be the description table or a subset of it. Omit completely if the BAM contains a single sample.
+`barcodes`:   Optional demultiplexing table for use with Christian's design. This may be the description table or a subset of it. Omit completely for non-multiplexed inputs.
 
 ### Advanced options
 
