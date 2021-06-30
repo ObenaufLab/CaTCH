@@ -23,7 +23,7 @@ opt = getopt(spec)
 
 # opt <- list(countsFile='/Users/kimon.froussios/Desktop/shona/data_barcode-counts.txt', summariesFile='/Users/kimon.froussios/Desktop/shona/data_summaries.txt', covars='/Users/kimon.froussios/Desktop/shona/samples.txt', resultsDir='/Users/kimon.froussios/Desktop/shona/results', count_thresh=10, reportTemplate='/Users/kimon.froussios/Github/catch/barcoding_results_template.Rmd')
 
-# opt <- list(countsFile='/Users/kimon.froussios/Desktop/andrea/Galaxy54-Collected_Barcode_Counts.txt', summariesFile='/Users/kimon.froussios/Desktop/andrea/Galaxy55-Collected_Barcode_Summaries.txt', covars='/Users/kimon.froussios/Desktop/andrea/samplesgfp.txt', resultsDir='/Users/kimon.froussios/Desktop/andrea/resultsgfp', count_thresh=10, reportTemplate='/Users/kimon.froussios/Github/catch/barcoding_results_template.Rmd')
+# opt <- list(countsFile='/users/kimon.froussios/obenauf/catch_test/galaxy/Collected_Barcode_Counts.tsv', summariesFile='/users/kimon.froussios/obenauf/catch_test/galaxy/Collected_Barcode_Summaries.tsv', covars='/users/kimon.froussios/obenauf/catch_test/galaxy/barcodes_proper_reheaded.txt', resultsDir='/users/kimon.froussios/obenauf/catch_test/galaxy/results', count_thresh=10, reportTemplate='~/catch/barcoding_results_template.Rmd')
 
 if ( !is.null(opt$help) ) {
   cat(getopt(spec, usage=TRUE))

@@ -9,16 +9,16 @@ output:
     toc_float:
       collapsed: false
       smooth_scroll: false
-params:
-  counts: './null'       # provide valid counts file with all the samples.
-  summaries: './null'    # provide valid summaries file with all the samples.
-  hammdist: '`r NULL`'   # provide valid tidy table for the hamming distance histograms
-  outpref: './null'      # provide a destination for the output table
-  samples: '`r NULL`'    # provide valid file listing samples, groups, conditions and assigned colours.
-  refsamps: 1            # Which samples to use as reference abundances for naming the barcodes (as listed in the file provided for the samples parameter).
-  count_thresh: 10       # Barcodes with counts below this will be discarded.
-  abund_thresh: 0.005     # Barcodes exceeding this proportional representation are considered top hits.
-  extra_bc: '`r NULL`'   # Comma-separated list of manually selected barcode IDs.
+# params:
+#   counts: './null'       # provide valid counts file with all the samples.
+#   summaries: './null'    # provide valid summaries file with all the samples.
+#   hammdist: '`r NULL`'   # provide valid tidy table for the hamming distance histograms
+#   outpref: './null'      # provide a destination for the output table
+#   samples: '`r NULL`'    # provide valid file listing samples, groups, conditions and assigned colours.
+#   refsamps: 1            # Which samples to use as reference abundances for naming the barcodes (as listed in the file provided for the samples parameter).
+#   count_thresh: 10       # Barcodes with counts below this will be discarded.
+#   abund_thresh: 0.005     # Barcodes exceeding this proportional representation are considered top hits.
+#   extra_bc: '`r NULL`'   # Comma-separated list of manually selected barcode IDs.
 ---
 
 ```{r setup, include=FALSE}
@@ -34,7 +34,7 @@ library(ggridges)
 library(RColorBrewer)
 library(patchwork)
 
-# params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
+params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
 
 # ggplot2 theme.
 gth <- theme(axis.line.x= element_line(),
@@ -246,7 +246,7 @@ pbccount1 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
 	scale_x_log10() +
 	annotation_logticks(sides="b") +
 	scale_colour_manual(values=mycolours) +
-	coord_cartesian(xlim=c(1, NA), ylim=c(1,NA)) +
+	# coord_cartesian(xlim=c(1, NULL), ylim=c(1, NULL)) +
 	labs(x='Read-count threshold', y='Barcodes') +
 	theme(panel.grid.minor=element_blank(),
 				legend.position="none")
@@ -258,9 +258,10 @@ pbccount2 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
 	scale_y_log10() +
 	annotation_logticks(sides="lb") +
 	scale_colour_manual(values=mycolours) +
-	coord_cartesian(xlim=c(1, NA), ylim=c(1,NA)) +
+	# coord_cartesian(xlim=c(1, NA), ylim=c(1, NA)) +
 	labs(x='Read-count threshold', y='Barcodes') +
-	theme(panel.grid.minor=element_blank())
+	theme(panel.grid.minor=element_blank(),
+				legend.position="bottom")
 
 print( pbccount1 | pbccount2 )
 
@@ -275,7 +276,6 @@ pbcpct1 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
 	geom_vline(xintercept=params$abund_thresh, linetype='dotted') +
 	scale_y_log10() +
 	annotation_logticks(sides="l") +
-	coord_cartesian(ylim=c(1,NA)) +
 	scale_colour_manual(values=mycolours) +
 	labs(x='Proportion threshold', y='Top Barcodes') +
 	theme(panel.grid.minor=element_blank(),
@@ -287,10 +287,10 @@ pbcpct2 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
 	scale_y_log10() +
 	scale_x_log10() +
 	annotation_logticks(sides="bl") +
-	coord_cartesian(ylim=c(1,NA)) +
 	scale_colour_manual(values=mycolours) +
 	labs(x='Proportion threshold', y='Top Barcodes') +
-	theme(panel.grid.minor=element_blank())
+	theme(panel.grid.minor=element_blank(),
+				legend.position='bottom')
 
 print( pbcpct1 | pbcpct2 )
 ```
