@@ -22,17 +22,17 @@ mergeBCcounts.R OUTPUT_FILE INPUT_FILE INPUT_FILE ...
 
 **GROUP/Obenauf/catch barcode count merger**
 
+The Galaxy implementation of this step merges all the counts tables together and all the summary tables together.
+
 ### Cluster options
 
-```
-Walltime: Estimated completion time. This step takes a few seconds.
-Memory:   Estimated memory use. The default 4GB should be plenty. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors. It will depend on the  number of samples and number of identified barcodes.
-```
+`Walltime`: Estimated completion time. This step takes a few seconds.
+
+`Memory`:   Estimated memory use. The default 4GB should be plenty. Increase this if you get slurm out-of-memory (oom) / memory-exceeded errors. It will depend on the  number of samples and number of identified barcodes.
+
 
 ### Main options
 
-```
-barcode counts: Either all the barcode counts files from Step 1, or all the summary files from Step 1.
-```
+`barcode counts`: Select the output from the quantification step. You can also upload samples from other quantification runs as individual table files or as a zipped bundle. **NOTE:** in order to be recognised, the tables must have filenames that end with `_barcode-counts.txt` and `_summary.txt`. If you use outputs from another CaTCH quantification step, this will be already done.
 
-You will need to run it separately for the barcode counts and for the summaries.
+

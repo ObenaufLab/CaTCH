@@ -1,6 +1,6 @@
-# CaTCH 0.8.0
+# CaTCH 0.8.0.dev
 
-CaTCH is a wetlab method for identifying cell clones from barcoded populations using CRISPRa-inducible reporters, developed in the Obenauf lab at the Intstitute for Molecular Pathology in Vienna.
+CaTCH is a wetlab method for identifying cell clones from barcoded populations using CRISPRa-inducible reporters, developed in the Obenauf lab at the Institute for Molecular Pathology in Vienna.
 
 *Isolating live cell clones from barcoded populations using CRISPRa-inducible reporters.*
 **Nat Biotechnol. 2021 Feb;39(2):174-178.**
@@ -37,18 +37,18 @@ so pooled lanes with this design need to be demultiplexed in advance (outside of
 
 ### Data description
 
-You will need to compile a table with the following columns and in that order:
+You will need to compile a table with all the samples to be analyzed, containing the following columns and in that order:
 
-1. `Tag` - The sample index. This should be a valid oligonucleotide (`[ATGC]`, no wildcards). A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications.
-2. `Sample` - A name for the sample.
+1. `Tag` - The sample index. This should be a valid oligonucleotide (`[ATGC]`, no wildcards). A mix of Tag lengths is allowed, but the shorter ones should not be substrings of the longer ones, to prevent misidentifications. If mixing multiplexed and non-multiplexed BAMs, use a dummy value like `XXXX` for Samples that don't need demultiplexing.
+2. `Sample` - A unique name for each sample.
 3. `Group` - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
-4. `Treatment` - The specific treatment far that sample.
-5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R.
+4. `Treatment` - The specific treatment for that sample.
+5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R. Most plain colour names (in lowercase) are recognised, though some are not as pleasant to look at. A suggested selection to choose from is: black, grey01 (dark) through grey99 (light), red, organge, darkgold, forestgreen, dodgerblue, steelblue, magenta, purple.
 
 For columns 2, 3 and 4 the **values must be** plain ASCII alphanumeric strings, starting with a letter. Underscores are allowed. 
 No accented or special letters, no spaces, no other symbols (including dashes). `^[A-Za-z][A-Za-z0-9_]*`
 
-Column 1 is optional and only applies to multiplexed BAM files using Christian's design for the barcode construct.
+Column 1 is optional and only applies to quantifying multiplexed BAM files using Christian's design for the barcode construct.
 
 ```
 Tag     Sample          Group       Treatment     Colour
@@ -165,10 +165,12 @@ This will compile a report using the **barcoding_results_template.Rmd** template
 
 **catch_workflow.sh**
 
-The workflow can be executed directly step by step, as described in the previous sections. This shell script is not required to analyse CaTCH data.
+The analysis can be executed step by step, as described in the previous sections. That is the most likely use case for you.
 
-This is my Bash script to automate steps 1-4. It requires a SLURM environment, and assumes all the dependencies have been made available in advance. 
-**I cannot promise it will work for you**, but at the very least it can be used as template to write a new pipeline. 
+The Bash script included here is my rough automation of steps 1-4. The script depends on a SLURM environment, and assumes all the software dependencies have been made available in advance. This script is entirely optional. **I cannot promise it will work for you**, it probably won't. But at the very least it can serve as a template from which to adapt a new script that is suitable for your system.  
+ 
+
+
 
 #### Parameters:
 
