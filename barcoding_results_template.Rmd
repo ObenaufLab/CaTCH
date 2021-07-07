@@ -344,7 +344,7 @@ pcount <- ggplot(data=count_summary, aes(x=Sample, y=Count, fill=Type))  +
             														 BCs_fltr = "darkgoldenrod3",
             														 BCs = "darkgoldenrod4",
                                          Reads= "black")) +
-            scale_y_continuous(expand = expansion(mult = c(0, .15)), limits = c(0, NA)) +
+            scale_y_continuous(expand=c(0, 0.15), limits = c(0, NA)) +
             labs(x=NULL, y=NULL) +
             gth + theme(legend.position = "none",
             						strip.placement='outside')
