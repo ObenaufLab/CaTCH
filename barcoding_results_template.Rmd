@@ -855,7 +855,7 @@ all_tidy[(any_Good), cum_rank := sum(prop_rank, na.rm=TRUE), by=bc_id]
 
 p1 <- ggplot(unique(all_tidy[cum_rank>0, .(bc_id, cum_rank)]), aes(x=cum_rank)) +
 	geom_histogram(bins=min(max(all_tidy$cum_rank)/2, 200)) +
-	labs(x="Cumulative rank", y="Barcodes", title="Potential interest") +
+	labs(x="Cumulative rank", y="Barcodes") +
 	theme_light()
 
 DF <- unique(all_tidy[, .(bc_id, cum_rank, nShared, nSharedGrp, nSharedTrt)])
