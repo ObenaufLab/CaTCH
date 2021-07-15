@@ -1,5 +1,5 @@
 ---
-title: "CaTCH report 0.8.0.dev"
+title: "CaTCH report"
 author: "Kimon Froussios"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
