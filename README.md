@@ -1,4 +1,4 @@
-# CaTCH 0.8.0.dev
+# CaTCH 0.8.0
 
 CaTCH is a wetlab method for identifying cell clones from barcoded populations using CRISPRa-inducible reporters, developed in the Obenauf lab at the Institute for Molecular Pathology in Vienna.
 
@@ -43,7 +43,7 @@ You will need to compile a table with all the samples to be analyzed, containing
 2. `Sample` - A unique name for each sample.
 3. `Group` - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
 4. `Treatment` - The specific treatment for that sample.
-5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R. Most plain colour names (in lowercase) are recognised, though some are not as pleasant to look at. A suggested selection to choose from is: black, grey01 (dark) through grey99 (light), red, organge, darkgold, forestgreen, dodgerblue, steelblue, magenta, purple.
+5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R. Most plain colour names (in lowercase) are recognised, though some are not as pleasant to look at. A suggested selection to choose from is: black, grey1 (dark) through grey99 (light), red, organge, darkgold, forestgreen, dodgerblue, steelblue, magenta, purple. For more precise control, hexadecimal RGB values in the format #RRGGBB should also work.
 
 For columns 2, 3 and 4 the **values must be** plain ASCII alphanumeric strings, starting with a letter. Underscores are allowed. 
 No accented or special letters, no spaces, no other symbols (including dashes). `^[A-Za-z][A-Za-z0-9_]*`
