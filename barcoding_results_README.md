@@ -13,7 +13,7 @@ In addition to the collective count and summary tables from the previous step, t
 2. `Sample` - The unique name of the sample.
 3. `Group` - A coarse grouping of the samples. For example if you have multiple different treatments and/or mutliple controls, you can group them as treated/untreated.
 4. `Treatment` - The specific treatment far that sample.
-5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R. A suggested colourset to choose from could be: black, red, orange, dodgerblue, steelblue, forestgreen, darkgold, magenta, purple.
+5. `Colour` - This is for display purposes in plots. You can use any colour name recognised by R. A suggested colourset to choose from could be: black, red, orange, dodgerblue, steelblue, forestgreen, darkgold, magenta, purple. For more precise control, hexadecimal RGB values in the format #RRGGBB should be possible as well.
 
 ```
 Tag     Sample          Group       Treatment     Colour
