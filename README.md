@@ -176,7 +176,7 @@ The Bash script included here is my rough automation of steps 1-4. The script de
 
 ```
 -b DIR          Directory with the BAM file(s) to be analysed.
--c FILE         Demultiplexing table, if applicable.
+-d FILE         Demultiplexing table, if applicable.
 -o DIR          Output directory for the counts files.
 -O DIR          Ouptut directory for the analysis report.
 -v FILE         Description table.
