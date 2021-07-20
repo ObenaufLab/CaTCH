@@ -68,7 +68,7 @@ CAATT   treatmentB_2    treated     treatmentB    orange
 
 ```
 -f FILE         A single BAM file.
--b FILE         Optional demultiplexing table for use with Christian's design. This may be the description table or a subset of it.
+-d FILE         Optional demultiplexing table for use with Christian's design. This may be the description table or a subset of it.
 -o DIR          Output directory for counts (./process/).
 --revcomp       Reverse complement the sample tags.
 --bc_len INT    Length of the barcode (not of the whole read) (68).
