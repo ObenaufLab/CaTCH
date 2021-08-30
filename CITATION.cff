@@ -1,8 +1,0 @@
-cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
-authors:
-  - family-names: Umkehrer, Holstein, Formenti, Jude, Froussios, Neumann, Cronin, Haas, Lipp, Burkard, Fellner, Wiesner, Zuber, Obenauf
-    given-names: Christian, Felix, Laura, Julian, Kimon, Tobias, Shona M, Lisa, Jesse J, Thomas R, Michaela, Thomas, Johannes, Anna C
-title: "Isolating live cell clones from barcoded populations using CRISPRa-inducible reporters"
-doi: 10.1038/s41587-020-0614-0
-date-released: 2020-10-12
