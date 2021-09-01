@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-## version 0.8.0.dev
+## version 0.8.2
 
 library(getopt)
 
@@ -21,7 +21,7 @@ spec = matrix(c(
 
 opt = getopt(spec)
 
-# opt <- list(countsFile='/users/kimon.froussios/obenauf/catch_test/galaxy/Collected_Barcode_Counts.tsv', summariesFile='/users/kimon.froussios/obenauf/catch_test/galaxy/Collected_Barcode_Summaries.tsv', covars='/users/kimon.froussios/obenauf/catch_test/galaxy/barcodes_proper_reheaded.txt', resultsDir='/users/kimon.froussios/obenauf/catch_test/galaxy/results', count_thresh=10, reportTemplate='~/catch/barcoding_results_template.Rmd')
+# opt <- list(countsFile='/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_160598/process/data_barcode-counts.txt', summariesFile='/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_160598/process/data_summaries.txt', covars='/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_160598/description/samples.txt', resultsDir='/Volumes/groups/obenauf/Kimon_Froussios/shona/catch_160598/results', count_thresh=50, reportTemplate='~/catch/barcoding_results_template.Rmd')
 
 if ( !is.null(opt$help) ) {
   cat(getopt(spec, usage=TRUE))
@@ -65,18 +65,23 @@ if( (length(DT) == 4 && names(DT) != c('Sample', 'Group', 'Treatment', 'Colour')
 
 bad <- grepl('(^[0-9])|([^0-9a-zA-z_])', DT$Sample, perl=TRUE)
 if (any(bad)) {
-  print(DT[bad, 'Sample'])
-  stop('Invalid sample name(s) detected. Names must start with a letter, and contain no spaces and no symbols (except underscore).')
+  stop(paste('Invalid sample name(s) detected (',
+             paste(DT[bad, 'Sample'], collapse=", "),
+             '). Names must start with a letter, and contain no spaces and no symbols (except underscore).'))
 }
+
 bad <- grepl('(^[0-9])|([^0-9a-zA-z_])', DT$Group, perl=TRUE)
 if (any(bad)) {
-  print(DT[bad, 'Group'])
-  stop('Invalid group name(s) detected. Names must start with a letter, and contain no spaces and no symbols (except underscore).')
+  stop(paste('Invalid group name(s) detected (',
+             paste(DT[bad, 'Group'], collapse=", "), 
+             '). Names must start with a letter, and contain no spaces and no symbols (except underscore).'))
 }
+
 bad <- grepl('(^[0-9])|([^0-9a-zA-z_])', DT$Treatment, perl=TRUE)
 if (any(bad)) {
-  print(DT[bad, 'Treatment'])
-  stop('Invalid treatment name(s) detected. Names must start with a letter, and contain no spaces and no symbols (except underscore).')
+  stop(paste('Invalid treatment name(s) detected (',
+             paste(DT[bad, 'Treatment'], collapse=", "), 
+             '). Names must start with a letter, and contain no spaces and no symbols (except underscore).'))
 }
 
 areColors <- function(x) {
@@ -88,14 +93,14 @@ areColors <- function(x) {
 
 bad <- ! areColors(DT$Colour)
 if (any(bad)) {
-  print(DT[bad, 'Colour'])
-  stop("Invalid colour value(s).")
+  stop( paste(paste(DT[bad, 'Colour'], collapse=", "), 
+              "is/are invalid colour value(s).") )
 }
 
 bad <- ! DT$Sample %in% names(read.delim(opt$countsFile))
 if (any(bad)) {
-  print(names(DT)[bad])
-  stop("Some of the sample names in the covariates table were not found in the counts table.")
+  stop(paste("Some sample names in the covariates table were not found in the counts table (", 
+             paste(DT$Sample[bad], collapse=", "),") ."))
 }
 
 rmarkdown::render(opt$reportTemplate,
