@@ -53,8 +53,13 @@ Please provide **full paths** to the files and directories.
 -T FILE         The path to barcoding_results_template.Rmd (or other suitable template that takes the same parameters).
 -v FILE         The description table.
 -p              In addition to the HTML report, output static figures into a PDF file for Illustrator or presentations (Default: false).
--r INT_LIST     Comma-separated list (without spaces) of integers designating the samples to use as reference abundance.
-                The numbers should correspond to the order in which  the samples appear in the collective summaries file, not counting the header line) (Default: 1).
+-r INT_LIST     Optional comma-separated list (without spaces) of integers designating the samples to use as reference. 
+                These should be samples that have not been bottlenecked and contain all the barcodes of the population. Barcodes will be 
+                named based on theeir abundance in theese samples, and any barcodes seen in othere samples but not seen in the refrence 
+                will be reemoved from all samples. If ommitted, the barcodes will bee named based no abundances in thee first availabel 
+                sample, but their presence/absence will not beee used as a filteering criterion.
+                The numbers should correspond to the order in which  the samples appear in the collective summaries file, not counting the
+                header line) (Default: ommit).
 -N INT          Count threshold for barcodes (Default: 50). The counting generates many low-count barcodes, as a result of sequencing errors.
                 These inflate the number of barcodes, so this threshold is provided to cut out that noise.
 -A FLOAT        Proportional abundance threshold to consider barcodes top hits (Default: 0.01). Range 0 - 1.
