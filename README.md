@@ -1,4 +1,4 @@
-# CaTCH 0.8.1
+# CaTCH 0.8.2
 
 CaTCH is a wetlab method for identifying cell clones from barcoded populations using CRISPRa-inducible reporters, developed in the Obenauf lab at the Institute for Molecular Pathology in Vienna.
 
@@ -183,7 +183,7 @@ The Bash script included here is my rough automation of steps 1-4. The script de
 -X DIR          Where to find all the scripts for this workflow (probably the path to your local clone of the repository).
 -m INT          Hamming distance at which to merge barcodes as likely sequencing errors, if applicable (0 ie. not applicable).
 -n INT          Number of dark bases to allow in the pattern (0).
--A FLOAT        Barcode abundance threshold for the report. Barcodes must make up at least this percentage of the sample's reads to be considered abundant                         (Default: 0.005 ie. 0.5% of reads).
+-A FLOAT        Barcode abundance threshold for the report. Barcodes must make up at least this percentage of the sample's reads to be considered abundant (0.005 ie. 0.5% of reads).
 -R INT_LIST     Comma-seperated list of rows in the description table to be used as reference samples in the report, NOT counting the header line 
                 (Default: ommit, ie. no true reference).
 -r              Reverse complement the sample tags (False).

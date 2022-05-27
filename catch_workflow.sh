@@ -9,7 +9,7 @@
 #SBATCH --output=catch.out
 #SBATCH --error=catch.err
 
-echo "CaTCH version 0.8.0.dev"
+echo "CaTCH version 0.8.2"
 
 
 function usage() {
@@ -29,7 +29,6 @@ post=1
 dark=0
 plot=1
 abund=0.01
-ref=1
 revcomp=0
 spikedin=0
 stringent=0
@@ -46,7 +45,7 @@ while getopts 'b:d:o:O:v:X:m:n:A:R:ris1234' flag; do
     m) hamm="${OPTARG}" ;;        # Hamming distance at which to merge barcodes as likely sequencing errors.
     n) dark="${OPTARG}" ;;        # Number of dark bases to allow in the pattern (0).
     A) abund="${OPTARG}" ;;       # Barcode abundance threshold for the report (0.01).
-    R) ref="${OPTARG}" ;;         # Comma seperated list of row numbers in covars to be used as reference samples in report, NOT counting the header line (1).
+    R) ref="${OPTARG}" ;;         # Comma seperated list of row numbers in covars to be used as reference samples in report, NOT counting the header line. If omitted, no reference will be used.
     r) revcomp=1 ;;               # Reverse complement the barcodes.
     i) spikedin=1 ;;              # Spike-in barcode was added (hard-coded barcode sequence).
     s) stringent=1 ;;             # Match full format of semi-random barcodes.
@@ -157,7 +156,11 @@ fi
 
 if [ "$plot" -eq 1 ]; then
   echo "${prefix}: Compiling barcoding report"
-  srun --mem=9G ${SCRIPTSPATH}/barcoding_results_run.R -c $(realpath ${outdir}/${prefix}_barcode-counts.txt) -s $(realpath ${outdir}/${prefix}_summaries.txt) -d $(realpath ${resdir}/${prefix}) -v $(realpath $covars) -r $ref -A $abund -p
+  if [ -z "$ref"]; then
+    srun --mem=9G ${SCRIPTSPATH}/barcoding_results_run.R -c $(realpath ${outdir}/${prefix}_barcode-counts.txt) -s $(realpath ${outdir}/${prefix}_summaries.txt) -d $(realpath ${resdir}/${prefix}) -v $(realpath $covars) -A $abund -p
+   else
+    srun --mem=9G ${SCRIPTSPATH}/barcoding_results_run.R -c $(realpath ${outdir}/${prefix}_barcode-counts.txt) -s $(realpath ${outdir}/${prefix}_summaries.txt) -d $(realpath ${resdir}/${prefix}) -v $(realpath $covars) -r $ref -A $abund -p
+   fi
 fi
 
 

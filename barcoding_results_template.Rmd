@@ -9,16 +9,16 @@ output:
     toc_float:
       collapsed: false
       smooth_scroll: false
-# params:
-#   counts: './null'       # provide valid counts file with all the samples.
-#   summaries: './null'    # provide valid summaries file with all the samples.
-#   hammdist: '`r NULL`'   # provide valid tidy table for the hamming distance histograms
-#   outpref: './null'      # provide a destination for the output table
-#   samples: '`r NULL`'    # provide valid file listing samples, groups, conditions and assigned colours.
-#   refsamps: 1            # Which samples to use as reference abundances for naming the barcodes (as listed in the file provided for the samples parameter).
-#   count_thresh: 10       # Barcodes with counts below this will be discarded.
-#   abund_thresh: 0.005     # Barcodes exceeding this proportional representation are considered top hits.
-#   extra_bc: '`r NULL`'   # Comma-separated list of manually selected barcode IDs.
+params:
+  counts: './null'       # provide valid counts file with all the samples.
+  summaries: './null'    # provide valid summaries file with all the samples.
+  hammdist: '`r NULL`'   # provide valid tidy table for the hamming distance histograms
+  outpref: './null'      # provide a destination for the output table
+  samples: '`r NULL`'    # provide valid file listing samples, groups, conditions and assigned colours.
+  refsamps: 1            # Which samples to use as reference abundances for naming the barcodes (as listed in the file provided for the samples parameter).
+  count_thresh: 10       # Barcodes with counts below this will be discarded.
+  abund_thresh: 0.005     # Barcodes exceeding this proportional representation are considered top hits.
+  extra_bc: '`r NULL`'   # Comma-separated list of manually selected barcode IDs.
 ---
 
 ```{r setup, include=FALSE}
@@ -34,7 +34,7 @@ library(ggridges)
 library(RColorBrewer)
 library(patchwork)
 
-params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
+# params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
 
 # ggplot2 theme.
 gth <- theme(axis.line.x= element_line(),
@@ -65,12 +65,8 @@ mycolours <- c(
 )
 
 # This works best when the colours are in a sensible sequence of gradual change.
-getPalette <- colorRampPalette(mycolours[1:25])
+getPalette <- colorRampPalette(mycolours[2:26])
 
-# Reshuffle colours for more contrast at low usage in the plots.
-mycolours <- mycolours[c(2,8,13,20, 3,9,14,21, 1,10,15,22, 4,11,16,23, 
-												 5,12,17,24, 6,18,25, 7,19,26, 
-												 27,31,34,38, 28,32,35,39, 29,33,36,40, 30,37)]
 
 # Thresholds
 count_thresh = params$count_thresh
@@ -210,8 +206,8 @@ pbcdist1 <- ggplot(all_tidy, aes(x=Reads+0.01, colour=Sample, fill=Sample)) +
 	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
 	scale_x_log10() +
 	annotation_logticks(sides="b") +
-	scale_colour_manual(values=mycolours) +
-	scale_fill_manual(values=mycolours) +
+	scale_colour_manual(values=getPalette(length(sampleNames))) +
+	scale_fill_manual(values=getPalette(length(sampleNames))) +
 	labs(x='Reads', y='Amount of Barcodes', title="Barcode abundances", subtitle='including non-detected BCs') +
 	theme_classic() +
 	theme(panel.grid.minor=element_blank(),
@@ -222,8 +218,8 @@ pbcdist2 <- ggplot(all_tidy[Reads > 0, ], aes(x=Reads, colour=Sample, fill=Sampl
 	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
 	scale_x_log10() +
 	annotation_logticks(sides="b") +
-	scale_colour_manual(values=mycolours) +
-	scale_fill_manual(values=mycolours) +
+	scale_colour_manual(values=getPalette(length(sampleNames))) +
+	scale_fill_manual(values=getPalette(length(sampleNames))) +
 	labs(x='Reads', y=NULL, subtitle='only detected BCs') +
 	theme_classic() +
 	theme(panel.grid.minor=element_blank(),
@@ -245,7 +241,7 @@ pbccount1 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
 	geom_vline(xintercept=params$count_thresh, linetype='dotted') +
 	scale_x_log10() +
 	annotation_logticks(sides="b") +
-	scale_colour_manual(values=mycolours) +
+	scale_colour_manual(values=getPalette(length(sampleNames))) +
 	# coord_cartesian(xlim=c(1, NULL), ylim=c(1, NULL)) +
 	labs(x='Read-count threshold', y='Barcodes') +
 	theme(panel.grid.minor=element_blank(),
@@ -257,7 +253,7 @@ pbccount2 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
 	scale_x_log10() +
 	scale_y_log10() +
 	annotation_logticks(sides="lb") +
-	scale_colour_manual(values=mycolours) +
+	scale_colour_manual(values=getPalette(length(sampleNames))) +
 	# coord_cartesian(xlim=c(1, NA), ylim=c(1, NA)) +
 	labs(x='Read-count threshold', y='Barcodes') +
 	theme(panel.grid.minor=element_blank(),
@@ -276,7 +272,7 @@ pbcpct1 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
 	geom_vline(xintercept=params$abund_thresh, linetype='dotted') +
 	scale_y_log10() +
 	annotation_logticks(sides="l") +
-	scale_colour_manual(values=mycolours) +
+	scale_colour_manual(values=getPalette(length(sampleNames))) +
 	labs(x='Proportion threshold', y='Top Barcodes') +
 	theme(panel.grid.minor=element_blank(),
 				legend.position='none')
@@ -287,7 +283,7 @@ pbcpct2 <- ggplot(bcbythresh, aes(x=threshold, y=V1, colour=Sample)) +
 	scale_y_log10() +
 	scale_x_log10() +
 	annotation_logticks(sides="bl") +
-	scale_colour_manual(values=mycolours) +
+	scale_colour_manual(values=getPalette(length(sampleNames))) +
 	labs(x='Proportion threshold', y='Top Barcodes') +
 	theme(panel.grid.minor=element_blank(),
 				legend.position='bottom')
@@ -701,16 +697,12 @@ tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=NA_character_, Reads=0, count_G
 
 # Assign colours
 elem <- as.character(unique(tmp$sharedFill[!is.na(tmp$sharedFill) & ! tmp$sharedFill %in% c('notshared', 'fillup')]))
-if (length(elem) > length(mycolours)){
-	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
+if (length(elem) > 0) {
 	elemcol <- getPalette(length(elem))
-} else if (length(elem) > 0) {
-	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
-	elemcol <- mycolours[1:length(elem)]
+	names(elemcol) <- elem
 } else {
 	elemcol <- character(0)
 }
-names(elemcol) <- elem
 elemcol["notshared"] <- "grey70"
 elemcol["fillup"] <- "grey95"
 
@@ -756,16 +748,12 @@ tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=-Inf, Reads=0, count_Good=NA,re
 
 # Assign colours
 elem <- as.character(unique(tmp$sharedFillGrp[!is.na(tmp$sharedFillGrp) & ! tmp$sharedFillGrp %in% c('notshared', 'fillup')]))
-if (length(elem) > length(mycolours)){
-	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
+if (length(elem) > 0)){
 	elemcol <- getPalette(length(elem))
-} else if (length(elem) > 0) {
-	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
-	elemcol <- mycolours[1:length(elem)]
+	names(elemcol) <- elem
 } else {
 	elemcol <- character(0)
 }
-names(elemcol) <- elem
 elemcol["notshared"] <- "grey70"
 elemcol["fillup"] <- "grey95"
 
@@ -813,16 +801,12 @@ tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=-Inf, Reads=0, count_Good=NA,re
 
 # Assign colours
 elem <- as.character(unique(tmp$sharedFillTrt[!is.na(tmp$sharedFillTrt) & ! tmp$sharedFillTrt %in% c('notshared', 'fillup')]))
-if (length(elem) > length(mycolours)){
-	warning("There are more barcodes than there are colours in the custom palette! Generating some more colours, Expect difficulty in distinguishing so many colours by eye.")
+if (length(elem) > 0)){
 	elemcol <- getPalette(length(elem))
-} else if (length(elem) > 0) {
-	# Remove superfluous colours to ensure the notshared and fillup entries get the intended colours.
-	elemcol <- mycolours[1:length(elem)]
+	names(elemcol) <- elem
 } else {
 	elemcol <- character(0)
 }
-names(elemcol) <- elem
 elemcol["notshared"] <- "grey70"
 elemcol["fillup"] <- "grey95"
 
