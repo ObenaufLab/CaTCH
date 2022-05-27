@@ -65,7 +65,7 @@ if args.demuxFile:
         if problems:
             sys.stderr.write('Sample names must: [1] start with a letter, [2] contain no unicode, no spaces and no symbols (except underscore).\n')
             sys.exit(0)
-    tagLens = {len(x) for x in bc}
+    tagLens = sorted(list(set({len(x) for x in bc})), reverse = True)
 else:
     bc["demuxed"] = prefix
 
