@@ -9,16 +9,16 @@ output:
     toc_float:
       collapsed: false
       smooth_scroll: false
-# params:
-#   counts: './null'       # provide valid counts file with all the samples.
-#   summaries: './null'    # provide valid summaries file with all the samples.
-#   hammdist: '`r NULL`'   # provide valid tidy table for the hamming distance histograms
-#   outpref: './null'      # provide a destination for the output table
-#   samples: '`r NULL`'    # provide valid file listing samples, groups, conditions and assigned colours.
-#   refsamps: 1            # Which samples to use as reference abundances for naming the barcodes (as listed in the file provided for the samples parameter).
-#   count_thresh: 10       # Barcodes with counts below this will be discarded.
-#   abund_thresh: 0.005     # Barcodes exceeding this proportional representation are considered top hits.
-#   extra_bc: '`r NULL`'   # Comma-separated list of manually selected barcode IDs.
+params:
+  counts: './null'       # provide valid counts file with all the samples.
+  summaries: './null'    # provide valid summaries file with all the samples.
+  hammdist: '`r NULL`'   # provide valid tidy table for the hamming distance histograms
+  outpref: './null'      # provide a destination for the output table
+  samples: '`r NULL`'    # provide valid file listing samples, groups, conditions and assigned colours.
+  refsamps: 1            # Which samples to use as reference abundances for naming the barcodes (as listed in the file provided for the samples parameter).
+  count_thresh: 10       # Barcodes with counts below this will be discarded.
+  abund_thresh: 0.005     # Barcodes exceeding this proportional representation are considered top hits.
+  extra_bc: '`r NULL`'   # Comma-separated list of manually selected barcode IDs.
 ---
 
 ```{r setup, include=FALSE}
@@ -34,7 +34,7 @@ library(ggridges)
 library(RColorBrewer)
 library(patchwork)
 
-params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
+# params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
 
 # ggplot2 theme.
 gth <- theme(axis.line.x= element_line(),
