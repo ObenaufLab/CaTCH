@@ -59,7 +59,7 @@ Please provide **full paths** to the files and directories.
                 will be removed from all samples. If ommitted, the barcodes will be named based on abundances in the first available 
                 sample, but their presence/absence will not be used as a filteering criterion.
                 The numbers should correspond to the order in which  the samples appear in the collective summaries file, not counting the
-                header line) (Default: ommit).
+                header line. (Default: ommit).
 -N INT          Count threshold for barcodes (Default: 50). The counting generates many low-count barcodes, as a result of sequencing errors.
                 These inflate the number of barcodes, so this threshold is provided to cut out that noise.
 -A FLOAT        Proportional abundance threshold to consider barcodes top hits (Default: 0.01). Range 0 - 1.
