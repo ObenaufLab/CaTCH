@@ -34,8 +34,6 @@ library(ggridges)
 library(RColorBrewer)
 library(patchwork)
 
-# params <- list(counts = opt$countsFile, summaries = opt$summariesFile, hammdist=opt$hammingFile, samples = opt$covars, outpref = file.path(opt$resultsDir, sub('.txt|.tsv', '', basename(opt$countsFile))), refsamps=opt$refsamps, abund_thresh=opt$abund_thresh, count_thresh=opt$count_thresh, extra_bc= opt$extrabc, hammdist = opt$hammdist )
-
 # ggplot2 theme.
 gth <- theme(axis.line.x= element_line(),
 	         axis.line.y= element_line(),
@@ -558,7 +556,7 @@ my_pairwise_internal_corels <- function(mat, samples = samples_tidy$Sample, meth
 }
 
 cplots <- my_pairwise_internal_corels(mat = cf[,2:length(cf)], method='spearman', prefix=paste0(params$outpref, '_spearman'))
-print( cplots[["frnc"]] + cplots[["drc"]] )
+print( cplots[["sfrnc"]] + cplots[["sdrc"]] )
 ```
 
 # Distribution of barcode abundances
@@ -748,7 +746,7 @@ tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=-Inf, Reads=0, count_Good=NA,re
 
 # Assign colours
 elem <- as.character(unique(tmp$sharedFillGrp[!is.na(tmp$sharedFillGrp) & ! tmp$sharedFillGrp %in% c('notshared', 'fillup')]))
-if (length(elem) > 0)){
+if (length(elem) > 0) {
 	elemcol <- getPalette(length(elem))
 	names(elemcol) <- elem
 } else {
@@ -801,7 +799,7 @@ tmp <- rbind(tmp, cbind(fillup, data.frame(bc_id=-Inf, Reads=0, count_Good=NA,re
 
 # Assign colours
 elem <- as.character(unique(tmp$sharedFillTrt[!is.na(tmp$sharedFillTrt) & ! tmp$sharedFillTrt %in% c('notshared', 'fillup')]))
-if (length(elem) > 0)){
+if (length(elem) > 0) {
 	elemcol <- getPalette(length(elem))
 	names(elemcol) <- elem
 } else {
